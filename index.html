@@ -1,0 +1,1595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Schedule & Chore Tracker</title>
+    <script src="https://cdn.tailwindcss.com">
+const userId = 1;
+
+function loadPointsFromServer() {
+    fetch(`load_points.php?user_id=${userId}`)
+        .then(response => response.text())
+        .then(points => {
+            userPoints = parseInt(points) || 0;
+            updatePointsDisplay();
+        });
+}
+
+function savePointsToServer() {
+    const data = new URLSearchParams();
+    data.append('user_id', userId);
+    data.append('total_points', userPoints);
+
+    fetch('save_points.php', {
+        method: 'POST',
+        body: data
+    });
+}
+
+
+function saveCompletedTasks() {
+    const completed = scheduleItems.filter(item => item.completed).map(item => ({
+        id: item.id,
+        task: item.task,
+        time: item.time,
+        type: item.type
+    }));
+    const data = new URLSearchParams();
+    data.append('user_id', userId);
+    data.append('date', getTodayString());
+    data.append('tasks', JSON.stringify(completed));
+    fetch('save_tasks.php', { method: 'POST', body: data });
+}
+
+function saveDailyNotes() {
+    const data = new URLSearchParams();
+    data.append('user_id', userId);
+    data.append('date', getTodayString());
+    data.append('notes', dailyNotes);
+    fetch('save_notes.php', { method: 'POST', body: data });
+}
+
+function loadDailyNotes() {
+    fetch(`load_notes.php?user_id=${userId}&date=${getTodayString()}`)
+        .then(response => response.text())
+        .then(notes => {
+            dailyNotes = notes || '';
+            dailyNotesEl.value = dailyNotes;
+        });
+}
+
+
+function loadHistoryData(date) {
+    const dataBox = document.getElementById('history-content');
+    dataBox.innerHTML = '<p class="text-gray-500">Loading...</p>';
+
+    Promise.all([
+        fetch(`load_notes.php?user_id=${userId}&date=${date}`).then(res => res.text()),
+        fetch(`load_tasks.php?user_id=${userId}&date=${date}`).then(res => res.json())
+    ])
+    .then(([notes, tasks]) => {
+        let html = '';
+
+        if (tasks.length > 0) {
+            html += '<div><h3 class="font-semibold text-gray-800 mb-1">Completed Tasks:</h3><ul class="list-disc list-inside text-gray-700">';
+            tasks.forEach(t => {
+                html += `<li><strong>${t.time}</strong> – ${t.task} (${t.type})</li>`;
+            });
+            html += '</ul></div>';
+        } else {
+            html += '<p class="text-gray-500">No completed tasks for this day.</p>';
+        }
+
+        if (notes) {
+            html += '<div class="mt-4"><h3 class="font-semibold text-gray-800 mb-1">Notes:</h3>';
+            html += `<p class="text-gray-700 whitespace-pre-line">${notes}</p></div>`;
+        }
+
+        dataBox.innerHTML = html;
+    })
+    .catch(() => {
+        dataBox.innerHTML = '<p class="text-red-500">Failed to load history data.</p>';
+    });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    const historyInput = document.getElementById("history-date");
+    if (historyInput) {
+        historyInput.addEventListener("change", () => {
+            const selectedDate = historyInput.value;
+            if (selectedDate) loadHistoryData(selectedDate);
+        });
+    }
+});
+
+</script>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: #f0f9ff;
+        }
+        .task-card {
+            transition: all 0.3s ease;
+        }
+        .task-card:hover {
+            transform: translateY(-3px);
+        }
+        .completed {
+            opacity: 0.6;
+            text-decoration: line-through;
+        }
+        .current-task {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #f00;
+            opacity: 0;
+        }
+        .focus-block {
+            border-left: 4px solid #3b82f6;
+        }
+        .break-block {
+            border-left: 4px solid #10b981;
+        }
+        .chore-block {
+            border-left: 4px solid #f59e0b;
+        }
+        .personal-block {
+            border-left: 4px solid #8b5cf6;
+        }
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #68D391;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #68D391;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row justify-between items-center mb-8">
+            <div>
+                <h1 class="text-3xl md:text-4xl font-bold text-blue-600">My Daily Schedule</h1>
+                <p class="text-gray-600" id="current-date">Loading date...</p>
+            </div>
+            <div class="mt-4 md:mt-0 bg-white p-4 rounded-lg shadow-md">
+                <p class="text-xl font-bold text-center" id="current-time">Loading time...</p>
+                <p class="text-sm text-gray-500 text-center">Current Time</p>
+            </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="mb-8">
+            <div class="flex justify-between mb-2">
+                <span class="text-sm font-medium text-blue-700">Daily Progress</span>
+                <span class="text-sm font-medium text-blue-700" id="progress-text">0%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-4">
+                <div class="bg-blue-600 h-4 rounded-full transition-all duration-500" id="progress-bar" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="mb-6">
+            <div class="flex border-b border-gray-200">
+                <button class="tab-btn py-2 px-4 font-semibold border-b-2 border-blue-500 text-blue-600" data-tab="schedule">Daily Schedule</button>
+                <button class="tab-btn py-2 px-4 font-semibold text-gray-500 hover:text-gray-700" data-tab="weekly">Weekly Chores</button>
+                <button class="tab-btn py-2 px-4 font-semibold text-gray-500 hover:text-gray-700" data-tab="monthly">Monthly Chores</button>
+                <button class="tab-btn py-2 px-4 font-semibold text-gray-500 hover:text-gray-700" data-tab="rewards">Rewards</button>
+            </div>
+        </div>
+
+        <!-- Schedule Tab Content -->
+        <div id="schedule-tab" class="tab-content">
+            <div class="flex justify-between mb-4">
+                <h2 class="text-xl font-bold text-gray-800">Today's Schedule</h2>
+                <button id="edit-schedule" class="bg-blue-100 text-blue-600 px-3 py-1 rounded-md hover:bg-blue-200 transition">
+                    Edit Schedule
+                </button>
+            </div>
+            <div id="schedule-container" class="space-y-3"></div>
+            
+            <!-- Notes Section -->
+            <div class="mt-6 bg-white p-4 rounded-lg shadow-sm">
+                <h3 class="text-lg font-semibold text-gray-800 mb-2">Today's Notes</h3>
+                <textarea id="daily-notes" class="w-full h-24 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Write your notes here..."></textarea>
+                <div class="mt-2 text-right">
+                    <button id="save-notes" class="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 transition">Save Notes</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Weekly Chores Tab Content -->
+        <div id="weekly-tab" class="tab-content hidden">
+            <div class="flex justify-between mb-4">
+                <h2 class="text-xl font-bold text-gray-800">Weekly Chores</h2>
+                <button id="add-weekly-chore" class="bg-green-100 text-green-600 px-3 py-1 rounded-md hover:bg-green-200 transition">
+                    Add Chore
+                </button>
+            </div>
+            <div class="grid grid-cols-1 gap-4" id="weekly-container">
+                <!-- Days of the week will be populated here -->
+            </div>
+        </div>
+
+        <!-- Monthly Chores Tab Content -->
+        <div id="monthly-tab" class="tab-content hidden">
+            <div class="flex justify-between mb-4">
+                <h2 class="text-xl font-bold text-gray-800">Monthly Chores</h2>
+                <button id="add-monthly-chore" class="bg-purple-100 text-purple-600 px-3 py-1 rounded-md hover:bg-purple-200 transition">
+                    Add Chore
+                </button>
+            </div>
+            <div class="grid grid-cols-1 gap-4" id="monthly-container">
+                <!-- Weeks will be populated here -->
+            </div>
+        </div>
+
+        <!-- Rewards Tab Content -->
+        <div id="rewards-tab" class="tab-content hidden">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-800">Points & Rewards</h2>
+                <button id="point-settings" class="bg-blue-100 text-blue-600 px-3 py-1 rounded-md hover:bg-blue-200 transition">
+                    Point Settings
+                </button>
+            </div>
+            
+            <div id="points-display-container" class="bg-gradient-to-r from-purple-100 to-pink-100 p-6 rounded-lg shadow-md mb-6">
+                <h2 class="text-xl font-bold text-purple-800 mb-2">Your Points: <span id="points-display">0</span></h2>
+                <div class="w-full bg-white rounded-full h-4 mb-2">
+                    <div class="bg-purple-600 h-4 rounded-full transition-all duration-500" id="points-progress" style="width: 0%"></div>
+                </div>
+                <p class="text-sm text-purple-700">Keep completing tasks to earn rewards!</p>
+            </div>
+            
+            <div class="flex justify-between mb-4">
+                <h3 class="text-lg font-bold text-gray-800">Available Rewards</h3>
+                <button id="add-reward" class="bg-purple-100 text-purple-600 px-3 py-1 rounded-md hover:bg-purple-200 transition">
+                    Add Reward
+                </button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="rewards-container"></div>
+        </div>
+
+        <!-- Edit Schedule Modal -->
+        <div id="edit-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg p-6 w-full max-w-md max-h-[80vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold text-gray-800">Edit Schedule</h3>
+                    <button id="close-modal" class="text-gray-500 hover:text-gray-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div id="edit-schedule-container" class="space-y-4"></div>
+                <div class="mt-6 flex justify-between">
+                    <button id="add-schedule-item" class="bg-blue-100 text-blue-600 px-4 py-2 rounded-md hover:bg-blue-200 transition">
+                        Add Item
+                    </button>
+                    <button id="save-schedule" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition">
+                        Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Chore Modal -->
+        <div id="chore-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg p-6 w-full max-w-md">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold text-gray-800" id="chore-modal-title">Add New Chore</h3>
+                    <button id="close-chore-modal" class="text-gray-500 hover:text-gray-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-gray-700 mb-1">Chore Name</label>
+                        <input type="text" id="chore-name" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div id="chore-points-container">
+                        <label class="block text-gray-700 mb-1">Points</label>
+                        <input type="number" id="chore-points" min="1" value="5" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div id="chore-day-container" class="hidden">
+                        <label class="block text-gray-700 mb-1">Day</label>
+                        <select id="chore-day" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="Monday">Monday</option>
+                            <option value="Tuesday">Tuesday</option>
+                            <option value="Wednesday">Wednesday</option>
+                            <option value="Thursday">Thursday</option>
+                            <option value="Friday">Friday</option>
+                            <option value="Saturday">Saturday</option>
+                            <option value="Sunday">Sunday</option>
+                        </select>
+                    </div>
+                    <div id="chore-week-container" class="hidden">
+                        <label class="block text-gray-700 mb-1">Week</label>
+                        <select id="chore-week" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="Week 1">Week 1</option>
+                            <option value="Week 2">Week 2</option>
+                            <option value="Week 3">Week 3</option>
+                            <option value="Week 4">Week 4</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-6">
+                    <button id="save-chore" class="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition">
+                        Add Chore
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Reward Modal -->
+        <div id="reward-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg p-6 w-full max-w-md">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold text-gray-800">Add New Reward</h3>
+                    <button id="close-reward-modal" class="text-gray-500 hover:text-gray-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-gray-700 mb-1">Reward Name</label>
+                        <input type="text" id="reward-name" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 mb-1">Points Required</label>
+                        <input type="number" id="reward-points" min="1" value="20" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 mb-1">Icon (emoji)</label>
+                        <input type="text" id="reward-icon" value="🎁" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+                <div class="mt-6">
+                    <button id="save-reward" class="w-full bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition">
+                        Add Reward
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Point Settings Modal -->
+        <div id="points-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg p-6 w-full max-w-md">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold text-gray-800">Point Settings</h3>
+                    <button id="close-points-modal" class="text-gray-500 hover:text-gray-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="space-y-6">
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-gray-700 font-medium">Enable Points System</span>
+                            <div class="relative inline-block w-12 align-middle select-none">
+                                <input type="checkbox" id="points-toggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer" checked />
+                                <label for="points-toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
+                            </div>
+                        </div>
+                        <p class="text-sm text-gray-500">Turn off to hide points and rewards but still track task completion.</p>
+                    </div>
+                    
+                    <div id="point-values-container">
+                        <h4 class="font-semibold text-gray-700 mb-2">Default Point Values</h4>
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between">
+                                <label class="text-gray-600">Daily Schedule Tasks</label>
+                                <input type="number" id="daily-task-points" min="0" value="5" class="w-20 border border-gray-300 rounded-md px-2 py-1 text-center">
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <label class="text-gray-600">Weekly Chores</label>
+                                <input type="number" id="weekly-chore-points" min="0" value="10" class="w-20 border border-gray-300 rounded-md px-2 py-1 text-center">
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <label class="text-gray-600">Monthly Chores</label>
+                                <input type="number" id="monthly-chore-points" min="0" value="20" class="w-20 border border-gray-300 rounded-md px-2 py-1 text-center">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <button id="reset-points" class="text-red-600 hover:text-red-800 text-sm">Reset all points to zero</button>
+                    </div>
+                </div>
+                <div class="mt-6">
+                    <button id="save-points-settings" class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition">
+                        Save Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Meal Input Modal -->
+        <div id="meal-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg p-6 w-full max-w-md">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold text-gray-800">What did you eat?</h3>
+                    <button id="close-meal-modal" class="text-gray-500 hover:text-gray-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-gray-700 mb-1">Today's Meal</label>
+                        <textarea id="meal-notes" class="w-full h-24 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Write what you ate here..."></textarea>
+                    </div>
+                </div>
+                <div class="mt-6">
+                    <button id="save-meal" class="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition">
+                        Save
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Celebration Modal -->
+        <div id="celebration-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg p-6 w-full max-w-md text-center">
+                <div class="mb-4">
+                    <div class="text-5xl mb-2">🎉</div>
+                    <h3 class="text-2xl font-bold text-purple-800">Great Job!</h3>
+                    <p class="text-gray-600 mt-2" id="celebration-message">You've completed a task!</p>
+                </div>
+                <div class="mt-6">
+                    <button id="close-celebration" class="bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700 transition">
+                        Awesome!
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Initial data
+        let scheduleItems = [
+            { id: 1, time: '08:00', task: 'Wake up, make bed, Brush teeth', completed: false, type: 'personal', points: 5 },
+            { id: 2, time: '08:30', task: 'Eat breakfast, Refill dog bowls (AM), Tidy room', completed: false, type: 'chore', points: 5 },
+            { id: 3, time: '09:00', task: 'Focus Block 1: Schoolwork', completed: false, type: 'focus', endTime: '11:00', points: 5 },
+            { id: 4, time: '11:00', task: 'Movement break (walk/stretch)', completed: false, type: 'break', endTime: '11:15', points: 5 },
+            { id: 5, time: '11:15', task: 'Focus Block 2: Schoolwork', completed: false, type: 'focus', endTime: '13:15', points: 5 },
+            { id: 6, time: '13:15', task: 'Lunch break', completed: false, type: 'break', endTime: '13:45', hasMealInput: true, points: 5 },
+            { id: 7, time: '13:45', task: 'Dishes and kitchen cleanup', completed: false, type: 'chore', endTime: '14:15', points: 5 },
+            { id: 8, time: '14:15', task: 'Focus Block 3: Schoolwork', completed: false, type: 'focus', endTime: '16:15', points: 5 },
+            { id: 9, time: '16:15', task: 'Free time / hobby', completed: false, type: 'personal', endTime: '17:15', points: 5 },
+            { id: 10, time: '17:15', task: 'Clean up bedroom, Help with laundry', completed: false, type: 'chore', endTime: '18:15', points: 5 },
+            { id: 11, time: '18:30', task: 'Dinner, Refill dog bowls (PM)', completed: false, type: 'personal', endTime: '19:30', points: 5 },
+            { id: 12, time: '19:30', task: 'Shower, Clean room, Clean dog bowls (Saturday)', completed: false, type: 'chore', endTime: '20:30', points: 5 },
+            { id: 13, time: '20:30', task: 'Snack & relax with Mom/Mimi', completed: false, type: 'personal', endTime: '21:30', points: 5 },
+            { id: 14, time: '21:30', task: 'Wash face, Brush teeth, Wipe bathroom counter, Take medicine', completed: false, type: 'personal', endTime: '22:00', points: 5 },
+            { id: 15, time: '22:00', task: 'Electronics off, wind down', completed: false, type: 'personal', endTime: '22:30', points: 5 },
+            { id: 16, time: '22:30', task: 'Bedtime', completed: false, type: 'personal', points: 5 }
+        ];
+
+        let weeklyChores = [
+            { id: 1, day: 'Monday', task: 'Help with laundry', points: 10, completed: false },
+            { id: 2, day: 'Tuesday', task: 'Vacuum bedroom', points: 10, completed: false },
+            { id: 3, day: 'Tuesday', task: 'Vacuum hallway', points: 5, completed: false },
+            { id: 4, day: 'Wednesday', task: 'Wipe bathroom sinks', points: 10, completed: false },
+            { id: 5, day: 'Wednesday', task: 'Help with laundry', points: 10, completed: false },
+            { id: 6, day: 'Thursday', task: 'Empty wastebaskets (room, bathrooms, Mimi\'s office)', points: 10, completed: false },
+            { id: 7, day: 'Friday', task: 'Help with laundry', points: 10, completed: false },
+            { id: 8, day: 'Saturday', task: 'Clean mirrors', points: 10, completed: false },
+            { id: 9, day: 'Saturday', task: 'Clean dog water bowls', points: 5, completed: false },
+            { id: 10, day: 'Sunday', task: 'Help with laundry', points: 10, completed: false },
+            { id: 11, day: 'Sunday', task: 'Tidy hobby/play area', points: 10, completed: false }
+        ];
+
+        let monthlyChores = [
+            { id: 1, week: 'Week 1', task: 'Closet clean', points: 20, completed: false },
+            { id: 2, week: 'Week 2', task: 'Wipe baseboards + door frames', points: 20, completed: false },
+            { id: 3, week: 'Week 3', task: 'Yarn and bead organization', points: 20, completed: false },
+            { id: 4, week: 'Week 4', task: 'Declutter desk or drawers', points: 20, completed: false }
+        ];
+
+        let rewards = [
+            { id: 1, name: '30 minutes extra screen time', points: 20, icon: '📱' },
+            { id: 2, name: 'Choose dinner one night', points: 50, icon: '🍕' },
+            { id: 3, name: 'New craft supplies', points: 75, icon: '🧶' },
+            { id: 4, name: 'Trip to favorite store', points: 100, icon: '🛍️' }
+        ];
+
+        // Settings
+        let settings = {
+            pointsEnabled: true,
+            defaultPoints: {
+                dailyTask: 5,
+                weeklyChore: 10,
+                monthlyChore: 20
+            }
+        };
+
+        let userPoints = 0;
+        const maxPoints = 200;
+        let dailyNotes = '';
+        let mealNotes = '';
+
+        // DOM Elements
+        const currentDateEl = document.getElementById('current-date');
+        const currentTimeEl = document.getElementById('current-time');
+        const progressBarEl = document.getElementById('progress-bar');
+        const progressTextEl = document.getElementById('progress-text');
+        const scheduleContainer = document.getElementById('schedule-container');
+        const weeklyContainer = document.getElementById('weekly-container');
+        const monthlyContainer = document.getElementById('monthly-container');
+        const rewardsContainer = document.getElementById('rewards-container');
+        const pointsDisplay = document.getElementById('points-display');
+        const pointsProgress = document.getElementById('points-progress');
+        const pointsDisplayContainer = document.getElementById('points-display-container');
+        const editModal = document.getElementById('edit-modal');
+        const choreModal = document.getElementById('chore-modal');
+        const rewardModal = document.getElementById('reward-modal');
+        const pointsModal = document.getElementById('points-modal');
+        const mealModal = document.getElementById('meal-modal');
+        const celebrationModal = document.getElementById('celebration-modal');
+        const celebrationMessage = document.getElementById('celebration-message');
+        const dailyNotesEl = document.getElementById('daily-notes');
+
+        // Tab functionality
+        const tabButtons = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const tabName = button.getAttribute('data-tab');
+                
+                // Update button styles
+                tabButtons.forEach(btn => {
+                    if (btn === button) {
+                        btn.classList.add('border-b-2', 'border-blue-500', 'text-blue-600');
+                        btn.classList.remove('text-gray-500');
+                    } else {
+                        btn.classList.remove('border-b-2', 'border-blue-500', 'text-blue-600');
+                        btn.classList.add('text-gray-500');
+                    }
+                });
+                
+                // Show/hide tab content
+                tabContents.forEach(content => {
+                    if (content.id === `${tabName}-tab`) {
+                        content.classList.remove('hidden');
+                    } else {
+                        content.classList.add('hidden');
+                    }
+                });
+            });
+        });
+
+        // Helper functions
+        function getTodayString() {
+            const today = new Date();
+            return today.toISOString().split('T')[0];
+        }
+
+        function formatTime(timeString) {
+            const [hours, minutes] = timeString.split(':');
+            const hour = parseInt(hours);
+            const ampm = hour >= 12 ? 'PM' : 'AM';
+            const formattedHour = hour % 12 || 12;
+            return `${formattedHour}:${minutes} ${ampm}`;
+        }
+
+        function updateDateTime() {
+            const now = new Date();
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            currentDateEl.textContent = now.toLocaleDateString('en-US', options);
+            
+            const timeOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
+            currentTimeEl.textContent = now.toLocaleTimeString('en-US', timeOptions);
+            
+            // Highlight current task
+            updateCurrentTask();
+        }
+
+        function updateCurrentTask() {
+            const now = new Date();
+            const currentHour = now.getHours();
+            const currentMinute = now.getMinutes();
+            const currentTimeValue = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`;
+            
+            // Sort schedule by time
+            const sortedSchedule = [...scheduleItems].sort((a, b) => a.time.localeCompare(b.time));
+            
+            // Find the current task
+            let currentTask = null;
+            
+            for (let i = 0; i < sortedSchedule.length; i++) {
+                const item = sortedSchedule[i];
+                const nextItem = sortedSchedule[i + 1];
+                
+                if (item.time <= currentTimeValue && (!nextItem || nextItem.time > currentTimeValue)) {
+                    currentTask = item;
+                    break;
+                }
+            }
+            
+            // Update UI to highlight current task
+            document.querySelectorAll('.schedule-item').forEach(item => {
+                item.classList.remove('current-task', 'bg-blue-50');
+                
+                if (currentTask && item.dataset.id == currentTask.id) {
+                    item.classList.add('current-task', 'bg-blue-50');
+                }
+            });
+        }
+
+        function updateProgress() {
+            const totalTasks = scheduleItems.length;
+            const completedTasks = scheduleItems.filter(item => item.completed).length;
+            
+            const progressPercentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+            
+            progressBarEl.style.width = `${progressPercentage}%`;
+            progressTextEl.textContent = `${progressPercentage}%`;
+        }
+
+        function updatePointsDisplay() {
+            pointsDisplay.textContent = userPoints;
+            const percentage = Math.min((userPoints / maxPoints) * 100, 100);
+            pointsProgress.style.width = `${percentage}%`;
+            
+            // Show/hide points display based on settings
+            if (settings.pointsEnabled) {
+                pointsDisplayContainer.classList.remove('hidden');
+                document.getElementById('add-reward').classList.remove('hidden');
+            } else {
+                pointsDisplayContainer.classList.add('hidden');
+                document.getElementById('add-reward').classList.add('hidden');
+            }
+        }
+
+        function getTypeClass(type) {
+            switch(type) {
+                case 'focus': return 'focus-block';
+                case 'break': return 'break-block';
+                case 'chore': return 'chore-block';
+                case 'personal': return 'personal-block';
+                default: return '';
+            }
+        }
+
+        function getTypeColor(type) {
+            switch(type) {
+                case 'focus': return 'bg-blue-50';
+                case 'break': return 'bg-green-50';
+                case 'chore': return 'bg-amber-50';
+                case 'personal': return 'bg-purple-50';
+                default: return 'bg-white';
+            }
+        }
+
+        function renderSchedule() {
+            scheduleContainer.innerHTML = '';
+            
+            // Sort schedule by time
+            const sortedSchedule = [...scheduleItems].sort((a, b) => a.time.localeCompare(b.time));
+            
+            sortedSchedule.forEach(item => {
+                const itemEl = document.createElement('div');
+                itemEl.className = `schedule-item task-card flex items-center p-3 rounded-lg shadow-sm ${getTypeClass(item.type)} ${getTypeColor(item.type)} ${item.completed ? 'completed' : ''}`;
+                itemEl.dataset.id = item.id;
+                
+                let timeDisplay = formatTime(item.time);
+                if (item.endTime) {
+                    timeDisplay += ` - ${formatTime(item.endTime)}`;
+                }
+                
+                let pointsDisplay = '';
+                if (settings.pointsEnabled) {
+                    pointsDisplay = `<span class="text-xs font-semibold text-blue-600 ml-2">+${item.points} pts</span>`;
+                }
+                
+                itemEl.innerHTML = `
+                    <div class="flex-shrink-0 w-24 text-center">
+                        <span class="font-semibold text-gray-700">${timeDisplay}</span>
+                    </div>
+                    <div class="ml-4 flex-grow">
+                        <div class="flex items-center">
+                            <p class="text-gray-800">${item.task}</p>
+                            ${pointsDisplay}
+                        </div>
+                        ${item.hasMealInput && item.completed && mealNotes ? `<p class="text-sm text-gray-600 mt-1">Ate: ${mealNotes}</p>` : ''}
+                    </div>
+                    <div class="flex-shrink-0 ml-2">
+                        <button class="complete-task w-6 h-6 rounded-full border-2 border-blue-500 flex items-center justify-center ${item.completed ? 'bg-blue-500' : ''}">
+                            ${item.completed ? '<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>' : ''}
+                        </button>
+                    </div>
+                `;
+                
+                scheduleContainer.appendChild(itemEl);
+                
+                // Add event listener to complete button
+                const completeBtn = itemEl.querySelector('.complete-task');
+                completeBtn.addEventListener('click', () => {
+                    if (!item.completed) {
+                        if (item.hasMealInput) {
+                            // Show meal input modal
+                            document.getElementById('meal-notes').value = mealNotes;
+                            mealModal.classList.remove('hidden');
+                            
+                            // Save reference to the item being completed
+                            mealModal.dataset.itemId = item.id;
+                        } else {
+                            item.completed = true;
+                            if (settings.pointsEnabled) {
+                                userPoints += item.points;
+                                updatePointsDisplay();
+                                showCelebration(`You completed "${item.task}"! +${item.points} points`);
+                            } else {
+                                showCelebration(`You completed "${item.task}"!`);
+                            }
+                            renderSchedule();
+                            updateProgress();
+                        }
+                    } else {
+                        item.completed = false;
+                        if (settings.pointsEnabled) {
+                            userPoints = Math.max(0, userPoints - item.points);
+                            updatePointsDisplay();
+                        }
+                        renderSchedule();
+                        updateProgress();
+                    }
+                });
+            });
+            
+            updateCurrentTask();
+            
+            // Update daily notes textarea
+            dailyNotesEl.value = dailyNotes;
+        }
+
+        function renderWeeklyChores() {
+            weeklyContainer.innerHTML = '';
+            
+            // Group chores by day
+            const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+            
+            days.forEach(day => {
+                const dayChores = weeklyChores.filter(chore => chore.day === day);
+                
+                if (dayChores.length > 0) {
+                    const dayEl = document.createElement('div');
+                    dayEl.className = 'bg-white rounded-lg shadow-sm overflow-hidden';
+                    
+                    // Check if today is this day
+                    const today = new Date();
+                    const isToday = today.toLocaleDateString('en-US', { weekday: 'long' }) === day;
+                    
+                    dayEl.innerHTML = `
+                        <div class="p-4 ${isToday ? 'bg-blue-100' : 'bg-gray-50'}">
+                            <h3 class="font-bold text-gray-800 ${isToday ? 'text-blue-800' : ''}">${day} ${isToday ? '(Today)' : ''}</h3>
+                        </div>
+                        <div class="p-4 space-y-3 chores-list" data-day="${day}"></div>
+                    `;
+                    
+                    weeklyContainer.appendChild(dayEl);
+                    
+                    const choresList = dayEl.querySelector('.chores-list');
+                    
+                    dayChores.forEach(chore => {
+                        const choreEl = document.createElement('div');
+                        choreEl.className = `flex items-center p-2 rounded-md ${chore.completed ? 'bg-gray-100 completed' : 'hover:bg-gray-50'}`;
+                        
+                        let pointsDisplay = '';
+                        if (settings.pointsEnabled) {
+                            pointsDisplay = `<span class="text-green-600 font-semibold text-sm">+${chore.points} pts</span>`;
+                        }
+                        
+                        choreEl.innerHTML = `
+                            <button class="complete-chore w-6 h-6 rounded-full border-2 border-green-500 flex items-center justify-center ${chore.completed ? 'bg-green-500' : ''}">
+                                ${chore.completed ? '<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>' : ''}
+                            </button>
+                            <span class="ml-3 flex-grow">${chore.task}</span>
+                            ${pointsDisplay}
+                            <div class="flex items-center">
+                                ${settings.pointsEnabled ? `
+                                <button class="edit-chore-points mr-2 text-blue-500 hover:text-blue-700">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                    </svg>
+                                </button>
+                                ` : ''}
+                                <button class="delete-chore text-red-500 hover:text-red-700">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                        `;
+                        
+                        choresList.appendChild(choreEl);
+                        
+                        // Add event listeners
+                        const completeBtn = choreEl.querySelector('.complete-chore');
+                        completeBtn.addEventListener('click', () => {
+                            if (!chore.completed) {
+                                chore.completed = true;
+                                if (settings.pointsEnabled) {
+                                    userPoints += chore.points;
+                                    updatePointsDisplay();
+                                    showCelebration(`You completed "${chore.task}"! +${chore.points} points`);
+                                } else {
+                                    showCelebration(`You completed "${chore.task}"!`);
+                                }
+                                renderWeeklyChores();
+                            } else {
+                                chore.completed = false;
+                                if (settings.pointsEnabled) {
+                                    userPoints = Math.max(0, userPoints - chore.points);
+                                    updatePointsDisplay();
+                                }
+                                renderWeeklyChores();
+                            }
+                        });
+                        
+                        if (settings.pointsEnabled) {
+                            const editPointsBtn = choreEl.querySelector('.edit-chore-points');
+                            editPointsBtn.addEventListener('click', () => {
+                                const newPoints = prompt(`Enter new point value for "${chore.task}":`, chore.points);
+                                if (newPoints !== null && !isNaN(newPoints) && newPoints >= 0) {
+                                    chore.points = parseInt(newPoints);
+                                    renderWeeklyChores();
+                                }
+                            });
+                        }
+                        
+                        const deleteBtn = choreEl.querySelector('.delete-chore');
+                        deleteBtn.addEventListener('click', () => {
+                            weeklyChores = weeklyChores.filter(c => c.id !== chore.id);
+                            renderWeeklyChores();
+                        });
+                    });
+                }
+            });
+        }
+
+        function renderMonthlyChores() {
+            monthlyContainer.innerHTML = '';
+            
+            // Group chores by week
+            const weeks = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
+            
+            weeks.forEach(week => {
+                const weekChores = monthlyChores.filter(chore => chore.week === week);
+                
+                if (weekChores.length > 0) {
+                    const weekEl = document.createElement('div');
+                    weekEl.className = 'bg-white rounded-lg shadow-sm overflow-hidden';
+                    
+                    // Determine if this is the current week of the month
+                    const today = new Date();
+                    const dayOfMonth = today.getDate();
+                    let currentWeek = '';
+                    
+                    if (dayOfMonth <= 7) currentWeek = 'Week 1';
+                    else if (dayOfMonth <= 14) currentWeek = 'Week 2';
+                    else if (dayOfMonth <= 21) currentWeek = 'Week 3';
+                    else currentWeek = 'Week 4';
+                    
+                    const isCurrentWeek = week === currentWeek;
+                    
+                    weekEl.innerHTML = `
+                        <div class="p-4 ${isCurrentWeek ? 'bg-purple-100' : 'bg-gray-50'}">
+                            <h3 class="font-bold text-gray-800 ${isCurrentWeek ? 'text-purple-800' : ''}">${week} ${isCurrentWeek ? '(Current)' : ''}</h3>
+                        </div>
+                        <div class="p-4 space-y-3 chores-list" data-week="${week}"></div>
+                    `;
+                    
+                    monthlyContainer.appendChild(weekEl);
+                    
+                    const choresList = weekEl.querySelector('.chores-list');
+                    
+                    weekChores.forEach(chore => {
+                        const choreEl = document.createElement('div');
+                        choreEl.className = `flex items-center p-2 rounded-md ${chore.completed ? 'bg-gray-100 completed' : 'hover:bg-gray-50'}`;
+                        
+                        let pointsDisplay = '';
+                        if (settings.pointsEnabled) {
+                            pointsDisplay = `<span class="text-purple-600 font-semibold text-sm">+${chore.points} pts</span>`;
+                        }
+                        
+                        choreEl.innerHTML = `
+                            <button class="complete-chore w-6 h-6 rounded-full border-2 border-purple-500 flex items-center justify-center ${chore.completed ? 'bg-purple-500' : ''}">
+                                ${chore.completed ? '<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>' : ''}
+                            </button>
+                            <span class="ml-3 flex-grow">${chore.task}</span>
+                            ${pointsDisplay}
+                            <div class="flex items-center">
+                                ${settings.pointsEnabled ? `
+                                <button class="edit-chore-points mr-2 text-blue-500 hover:text-blue-700">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                    </svg>
+                                </button>
+                                ` : ''}
+                                <button class="delete-chore text-red-500 hover:text-red-700">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                        `;
+                        
+                        choresList.appendChild(choreEl);
+                        
+                        // Add event listeners
+                        const completeBtn = choreEl.querySelector('.complete-chore');
+                        completeBtn.addEventListener('click', () => {
+                            if (!chore.completed) {
+                                chore.completed = true;
+                                if (settings.pointsEnabled) {
+                                    userPoints += chore.points;
+                                    updatePointsDisplay();
+                                    showCelebration(`You completed "${chore.task}"! +${chore.points} points`);
+                                } else {
+                                    showCelebration(`You completed "${chore.task}"!`);
+                                }
+                                renderMonthlyChores();
+                            } else {
+                                chore.completed = false;
+                                if (settings.pointsEnabled) {
+                                    userPoints = Math.max(0, userPoints - chore.points);
+                                    updatePointsDisplay();
+                                }
+                                renderMonthlyChores();
+                            }
+                        });
+                        
+                        if (settings.pointsEnabled) {
+                            const editPointsBtn = choreEl.querySelector('.edit-chore-points');
+                            editPointsBtn.addEventListener('click', () => {
+                                const newPoints = prompt(`Enter new point value for "${chore.task}":`, chore.points);
+                                if (newPoints !== null && !isNaN(newPoints) && newPoints >= 0) {
+                                    chore.points = parseInt(newPoints);
+                                    renderMonthlyChores();
+                                }
+                            });
+                        }
+                        
+                        const deleteBtn = choreEl.querySelector('.delete-chore');
+                        deleteBtn.addEventListener('click', () => {
+                            monthlyChores = monthlyChores.filter(c => c.id !== chore.id);
+                            renderMonthlyChores();
+                        });
+                    });
+                }
+            });
+        }
+
+        function renderRewards() {
+            rewardsContainer.innerHTML = '';
+            
+            if (!settings.pointsEnabled) {
+                rewardsContainer.innerHTML = `
+                    <div class="col-span-1 md:col-span-2 p-6 bg-gray-50 rounded-lg text-center">
+                        <p class="text-gray-600">Points system is currently disabled.</p>
+                        <p class="text-gray-600 mt-2">Enable points in Point Settings to use rewards.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            rewards.forEach(reward => {
+                const rewardEl = document.createElement('div');
+                rewardEl.className = 'task-card p-4 bg-white rounded-lg shadow-sm';
+                
+                const canAfford = userPoints >= reward.points;
+                
+                rewardEl.innerHTML = `
+                    <div class="flex items-center mb-3">
+                        <span class="text-3xl mr-3">${reward.icon}</span>
+                        <div>
+                            <h3 class="font-semibold text-gray-800">${reward.name}</h3>
+                            <p class="text-purple-600 text-sm font-bold">${reward.points} points</p>
+                        </div>
+                    </div>
+                    <div class="flex justify-between">
+                        <button class="redeem-reward px-3 py-2 rounded-md ${canAfford ? 'bg-purple-600 text-white hover:bg-purple-700' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}" ${canAfford ? '' : 'disabled'}>
+                            ${canAfford ? 'Redeem Reward' : 'Not Enough Points'}
+                        </button>
+                        <button class="delete-reward text-red-500 hover:text-red-700">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                `;
+                
+                rewardsContainer.appendChild(rewardEl);
+                
+                // Add event listeners
+                const redeemBtn = rewardEl.querySelector('.redeem-reward');
+                if (canAfford) {
+                    redeemBtn.addEventListener('click', () => {
+                        userPoints -= reward.points;
+                        updatePointsDisplay();
+                        renderRewards();
+                        showCelebration(`You redeemed "${reward.name}"! Enjoy your reward!`);
+                    });
+                }
+                
+                const deleteBtn = rewardEl.querySelector('.delete-reward');
+                deleteBtn.addEventListener('click', () => {
+                    rewards = rewards.filter(r => r.id !== reward.id);
+                    renderRewards();
+                });
+            });
+        }
+
+        function renderEditSchedule() {
+            const editContainer = document.getElementById('edit-schedule-container');
+            editContainer.innerHTML = '';
+            
+            // Sort schedule by time
+            const sortedSchedule = [...scheduleItems].sort((a, b) => a.time.localeCompare(b.time));
+            
+            sortedSchedule.forEach(item => {
+                const itemEl = document.createElement('div');
+                itemEl.className = 'space-y-2';
+                
+                let endTimeInput = '';
+                if (item.endTime) {
+                    endTimeInput = `
+                        <div class="flex items-center">
+                            <label class="w-24 text-sm text-gray-600">End Time:</label>
+                            <input type="time" value="${item.endTime}" class="end-time border border-gray-300 rounded-md px-2 py-1 flex-grow">
+                        </div>
+                    `;
+                }
+                
+                let mealCheckbox = '';
+                if (item.hasMealInput) {
+                    mealCheckbox = `
+                        <div class="flex items-center mt-1">
+                            <input type="checkbox" class="meal-input mr-2" checked>
+                            <label class="text-sm text-gray-600">Has meal input</label>
+                        </div>
+                    `;
+                } else {
+                    mealCheckbox = `
+                        <div class="flex items-center mt-1">
+                            <input type="checkbox" class="meal-input mr-2">
+                            <label class="text-sm text-gray-600">Has meal input</label>
+                        </div>
+                    `;
+                }
+                
+                let pointsInput = '';
+                if (settings.pointsEnabled) {
+                    pointsInput = `
+                        <div class="flex items-center">
+                            <label class="w-24 text-sm text-gray-600">Points:</label>
+                            <input type="number" value="${item.points}" min="0" class="points-value border border-gray-300 rounded-md px-2 py-1 w-20">
+                        </div>
+                    `;
+                }
+                
+                itemEl.innerHTML = `
+                    <div class="flex items-center">
+                        <label class="w-24 text-sm text-gray-600">Start Time:</label>
+                        <input type="time" value="${item.time}" class="start-time border border-gray-300 rounded-md px-2 py-1 flex-grow">
+                    </div>
+                    ${endTimeInput}
+                    <div class="flex items-center">
+                        <label class="w-24 text-sm text-gray-600">Task:</label>
+                        <input type="text" value="${item.task}" class="task-name border border-gray-300 rounded-md px-2 py-1 flex-grow">
+                    </div>
+                    <div class="flex items-center">
+                        <label class="w-24 text-sm text-gray-600">Type:</label>
+                        <select class="task-type border border-gray-300 rounded-md px-2 py-1 flex-grow">
+                            <option value="focus" ${item.type === 'focus' ? 'selected' : ''}>Focus Block</option>
+                            <option value="break" ${item.type === 'break' ? 'selected' : ''}>Break</option>
+                            <option value="chore" ${item.type === 'chore' ? 'selected' : ''}>Chore</option>
+                            <option value="personal" ${item.type === 'personal' ? 'selected' : ''}>Personal</option>
+                        </select>
+                    </div>
+                    ${pointsInput}
+                    ${mealCheckbox}
+                    <button class="delete-schedule-item text-red-500 hover:text-red-700 text-sm">
+                        Remove this item
+                    </button>
+                    <hr class="my-3">
+                `;
+                
+                editContainer.appendChild(itemEl);
+                
+                // Add event listener to delete button
+                const deleteBtn = itemEl.querySelector('.delete-schedule-item');
+                deleteBtn.addEventListener('click', () => {
+                    itemEl.remove();
+                });
+            });
+        }
+
+        function renderPointSettings() {
+            document.getElementById('points-toggle').checked = settings.pointsEnabled;
+            document.getElementById('daily-task-points').value = settings.defaultPoints.dailyTask;
+            document.getElementById('weekly-chore-points').value = settings.defaultPoints.weeklyChore;
+            document.getElementById('monthly-chore-points').value = settings.defaultPoints.monthlyChore;
+            
+            // Show/hide point values container based on toggle
+            const pointValuesContainer = document.getElementById('point-values-container');
+            if (settings.pointsEnabled) {
+                pointValuesContainer.classList.remove('hidden');
+            } else {
+                pointValuesContainer.classList.add('hidden');
+            }
+            
+            // Add event listener to toggle
+            document.getElementById('points-toggle').addEventListener('change', function() {
+                if (this.checked) {
+                    pointValuesContainer.classList.remove('hidden');
+                } else {
+                    pointValuesContainer.classList.add('hidden');
+                }
+            });
+        }
+
+        function showCelebration(message) {
+            celebrationMessage.textContent = message;
+            celebrationModal.classList.remove('hidden');
+            
+            // Create confetti effect
+            createConfetti();
+        }
+
+        function createConfetti() {
+            const confettiContainer = document.body;
+            const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'];
+            
+            for (let i = 0; i < 50; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.left = `${Math.random() * 100}%`;
+                confetti.style.top = `${Math.random() * 100}%`;
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.opacity = '1';
+                confettiContainer.appendChild(confetti);
+                
+                // Animate confetti
+                const animationDuration = 1000 + Math.random() * 2000;
+                confetti.animate([
+                    { transform: 'translateY(0) rotate(0)', opacity: 1 },
+                    { transform: `translateY(${100 + Math.random() * 200}px) rotate(${360 * Math.random()}deg)`, opacity: 0 }
+                ], {
+                    duration: animationDuration,
+                    easing: 'cubic-bezier(0.1, 0.8, 0.3, 1)'
+                });
+                
+                // Remove confetti after animation
+                setTimeout(() => {
+                    confetti.remove();
+                }, animationDuration);
+            }
+        }
+
+        // Event listeners
+        document.getElementById('edit-schedule').addEventListener('click', () => {
+            renderEditSchedule();
+            editModal.classList.remove('hidden');
+        });
+
+        document.getElementById('close-modal').addEventListener('click', () => {
+            editModal.classList.add('hidden');
+        });
+
+        document.getElementById('add-schedule-item').addEventListener('click', () => {
+            const editContainer = document.getElementById('edit-schedule-container');
+            const itemEl = document.createElement('div');
+            itemEl.className = 'space-y-2';
+            
+            let pointsInput = '';
+            if (settings.pointsEnabled) {
+                pointsInput = `
+                    <div class="flex items-center">
+                        <label class="w-24 text-sm text-gray-600">Points:</label>
+                        <input type="number" value="${settings.defaultPoints.dailyTask}" min="0" class="points-value border border-gray-300 rounded-md px-2 py-1 w-20">
+                    </div>
+                `;
+            }
+            
+            itemEl.innerHTML = `
+                <div class="flex items-center">
+                    <label class="w-24 text-sm text-gray-600">Start Time:</label>
+                    <input type="time" value="12:00" class="start-time border border-gray-300 rounded-md px-2 py-1 flex-grow">
+                </div>
+                <div class="flex items-center">
+                    <label class="w-24 text-sm text-gray-600">End Time:</label>
+                    <input type="time" value="12:30" class="end-time border border-gray-300 rounded-md px-2 py-1 flex-grow">
+                </div>
+                <div class="flex items-center">
+                    <label class="w-24 text-sm text-gray-600">Task:</label>
+                    <input type="text" value="New task" class="task-name border border-gray-300 rounded-md px-2 py-1 flex-grow">
+                </div>
+                <div class="flex items-center">
+                    <label class="w-24 text-sm text-gray-600">Type:</label>
+                    <select class="task-type border border-gray-300 rounded-md px-2 py-1 flex-grow">
+                        <option value="focus">Focus Block</option>
+                        <option value="break">Break</option>
+                        <option value="chore">Chore</option>
+                        <option value="personal" selected>Personal</option>
+                    </select>
+                </div>
+                ${pointsInput}
+                <div class="flex items-center mt-1">
+                    <input type="checkbox" class="meal-input mr-2">
+                    <label class="text-sm text-gray-600">Has meal input</label>
+                </div>
+                <button class="delete-schedule-item text-red-500 hover:text-red-700 text-sm">
+                    Remove this item
+                </button>
+                <hr class="my-3">
+            `;
+            
+            editContainer.appendChild(itemEl);
+            
+            // Add event listener to delete button
+            const deleteBtn = itemEl.querySelector('.delete-schedule-item');
+            deleteBtn.addEventListener('click', () => {
+                itemEl.remove();
+            });
+        });
+
+        document.getElementById('save-schedule').addEventListener('click', () => {
+            const editContainer = document.getElementById('edit-schedule-container');
+            const items = editContainer.querySelectorAll('div.space-y-2');
+            
+            const newSchedule = [];
+            items.forEach((item, index) => {
+                const startTimeInput = item.querySelector('.start-time');
+                const endTimeInput = item.querySelector('.end-time');
+                const taskInput = item.querySelector('.task-name');
+                const typeSelect = item.querySelector('.task-type');
+                const mealInput = item.querySelector('.meal-input');
+                const pointsInput = item.querySelector('.points-value');
+                
+                if (startTimeInput && startTimeInput.value && taskInput && taskInput.value) {
+                    const newItem = {
+                        id: index + 1,
+                        time: startTimeInput.value,
+                        task: taskInput.value,
+                        completed: false,
+                        type: typeSelect ? typeSelect.value : 'personal',
+                        points: settings.pointsEnabled && pointsInput ? parseInt(pointsInput.value) : settings.defaultPoints.dailyTask
+                    };
+                    
+                    if (endTimeInput && endTimeInput.value) {
+                        newItem.endTime = endTimeInput.value;
+                    }
+                    
+                    if (mealInput && mealInput.checked) {
+                        newItem.hasMealInput = true;
+                    }
+                    
+                    newSchedule.push(newItem);
+                }
+            });
+            
+            scheduleItems = newSchedule;
+            renderSchedule();
+            updateProgress();
+            editModal.classList.add('hidden');
+        });
+
+        document.getElementById('add-weekly-chore').addEventListener('click', () => {
+            document.getElementById('chore-modal-title').textContent = 'Add Weekly Chore';
+            document.getElementById('chore-name').value = '';
+            document.getElementById('chore-points').value = settings.defaultPoints.weeklyChore;
+            document.getElementById('chore-day-container').classList.remove('hidden');
+            document.getElementById('chore-week-container').classList.add('hidden');
+            document.getElementById('save-chore').dataset.type = 'weekly';
+            
+            // Show/hide points input based on settings
+            if (settings.pointsEnabled) {
+                document.getElementById('chore-points-container').classList.remove('hidden');
+            } else {
+                document.getElementById('chore-points-container').classList.add('hidden');
+            }
+            
+            choreModal.classList.remove('hidden');
+        });
+
+        document.getElementById('add-monthly-chore').addEventListener('click', () => {
+            document.getElementById('chore-modal-title').textContent = 'Add Monthly Chore';
+            document.getElementById('chore-name').value = '';
+            document.getElementById('chore-points').value = settings.defaultPoints.monthlyChore;
+            document.getElementById('chore-day-container').classList.add('hidden');
+            document.getElementById('chore-week-container').classList.remove('hidden');
+            document.getElementById('save-chore').dataset.type = 'monthly';
+            
+            // Show/hide points input based on settings
+            if (settings.pointsEnabled) {
+                document.getElementById('chore-points-container').classList.remove('hidden');
+            } else {
+                document.getElementById('chore-points-container').classList.add('hidden');
+            }
+            
+            choreModal.classList.remove('hidden');
+        });
+
+        document.getElementById('close-chore-modal').addEventListener('click', () => {
+            choreModal.classList.add('hidden');
+        });
+
+        document.getElementById('save-chore').addEventListener('click', () => {
+            const name = document.getElementById('chore-name').value.trim();
+            const points = settings.pointsEnabled ? parseInt(document.getElementById('chore-points').value) : 0;
+            const type = document.getElementById('save-chore').dataset.type;
+            
+            if (name) {
+                if (type === 'weekly') {
+                    const day = document.getElementById('chore-day').value;
+                    const newId = weeklyChores.length > 0 ? Math.max(...weeklyChores.map(c => c.id)) + 1 : 1;
+                    
+                    weeklyChores.push({
+                        id: newId,
+                        day: day,
+                        task: name,
+                        points: points || settings.defaultPoints.weeklyChore,
+                        completed: false
+                    });
+                    
+                    renderWeeklyChores();
+                } else if (type === 'monthly') {
+                    const week = document.getElementById('chore-week').value;
+                    const newId = monthlyChores.length > 0 ? Math.max(...monthlyChores.map(c => c.id)) + 1 : 1;
+                    
+                    monthlyChores.push({
+                        id: newId,
+                        week: week,
+                        task: name,
+                        points: points || settings.defaultPoints.monthlyChore,
+                        completed: false
+                    });
+                    
+                    renderMonthlyChores();
+                }
+                
+                choreModal.classList.add('hidden');
+            }
+        });
+
+        document.getElementById('add-reward').addEventListener('click', () => {
+            document.getElementById('reward-name').value = '';
+            document.getElementById('reward-points').value = '20';
+            document.getElementById('reward-icon').value = '🎁';
+            rewardModal.classList.remove('hidden');
+        });
+
+        document.getElementById('close-reward-modal').addEventListener('click', () => {
+            rewardModal.classList.add('hidden');
+        });
+
+        document.getElementById('save-reward').addEventListener('click', () => {
+            const name = document.getElementById('reward-name').value.trim();
+            const points = parseInt(document.getElementById('reward-points').value);
+            const icon = document.getElementById('reward-icon').value.trim() || '🎁';
+            
+            if (name && points > 0) {
+                const newId = rewards.length > 0 ? Math.max(...rewards.map(r => r.id)) + 1 : 1;
+                
+                rewards.push({
+                    id: newId,
+                    name: name,
+                    points: points,
+                    icon: icon
+                });
+                
+                renderRewards();
+                rewardModal.classList.add('hidden');
+            }
+        });
+
+        document.getElementById('point-settings').addEventListener('click', () => {
+            renderPointSettings();
+            pointsModal.classList.remove('hidden');
+        });
+
+        document.getElementById('close-points-modal').addEventListener('click', () => {
+            pointsModal.classList.add('hidden');
+        });
+
+        document.getElementById('save-points-settings').addEventListener('click', () => {
+            settings.pointsEnabled = document.getElementById('points-toggle').checked;
+            
+            if (settings.pointsEnabled) {
+                settings.defaultPoints.dailyTask = parseInt(document.getElementById('daily-task-points').value) || 5;
+                settings.defaultPoints.weeklyChore = parseInt(document.getElementById('weekly-chore-points').value) || 10;
+                settings.defaultPoints.monthlyChore = parseInt(document.getElementById('monthly-chore-points').value) || 20;
+            }
+            
+            updatePointsDisplay();
+            renderSchedule();
+            renderWeeklyChores();
+            renderMonthlyChores();
+            renderRewards();
+            
+            pointsModal.classList.add('hidden');
+            
+            showCelebration('Point settings updated!');
+        });
+
+        document.getElementById('reset-points').addEventListener('click', () => {
+            if (confirm('Are you sure you want to reset all points to zero?')) {
+                userPoints = 0;
+                updatePointsDisplay();
+                showCelebration('Points have been reset to zero.');
+            }
+        });
+
+        document.getElementById('close-meal-modal').addEventListener('click', () => {
+            mealModal.classList.add('hidden');
+        });
+
+        document.getElementById('save-meal').addEventListener('click', () => {
+            const mealNotesInput = document.getElementById('meal-notes').value.trim();
+            mealNotes = mealNotesInput;
+            
+            const itemId = parseInt(mealModal.dataset.itemId);
+            const item = scheduleItems.find(i => i.id === itemId);
+            
+            if (item) {
+                item.completed = true;
+                if (settings.pointsEnabled) {
+                    userPoints += item.points;
+                    updatePointsDisplay();
+                    showCelebration(`You completed "${item.task}"! +${item.points} points`);
+                } else {
+                    showCelebration(`You completed "${item.task}"!`);
+                }
+                renderSchedule();
+                updateProgress();
+            }
+            
+            mealModal.classList.add('hidden');
+        });
+
+        document.getElementById('close-celebration').addEventListener('click', () => {
+            celebrationModal.classList.add('hidden');
+        });
+
+        document.getElementById('save-notes').addEventListener('click', () => {
+            dailyNotes = document.getElementById('daily-notes').value;
+            showCelebration('Notes saved successfully!');
+        });
+
+        // Initialize the app
+        updateDateTime();
+        updatePointsDisplay();
+        renderSchedule();
+        renderWeeklyChores();
+        renderMonthlyChores();
+        renderRewards();
+        updateProgress();
+
+        // Update time every second
+        setInterval(updateDateTime, 1000);
+    
+const userId = 1;
+
+function loadPointsFromServer() {
+    fetch(`load_points.php?user_id=${userId}`)
+        .then(response => response.text())
+        .then(points => {
+            userPoints = parseInt(points) || 0;
+            updatePointsDisplay();
+        });
+}
+
+function savePointsToServer() {
+    const data = new URLSearchParams();
+    data.append('user_id', userId);
+    data.append('total_points', userPoints);
+
+    fetch('save_points.php', {
+        method: 'POST',
+        body: data
+    });
+}
+
+
+function saveCompletedTasks() {
+    const completed = scheduleItems.filter(item => item.completed).map(item => ({
+        id: item.id,
+        task: item.task,
+        time: item.time,
+        type: item.type
+    }));
+    const data = new URLSearchParams();
+    data.append('user_id', userId);
+    data.append('date', getTodayString());
+    data.append('tasks', JSON.stringify(completed));
+    fetch('save_tasks.php', { method: 'POST', body: data });
+}
+
+function saveDailyNotes() {
+    const data = new URLSearchParams();
+    data.append('user_id', userId);
+    data.append('date', getTodayString());
+    data.append('notes', dailyNotes);
+    fetch('save_notes.php', { method: 'POST', body: data });
+}
+
+function loadDailyNotes() {
+    fetch(`load_notes.php?user_id=${userId}&date=${getTodayString()}`)
+        .then(response => response.text())
+        .then(notes => {
+            dailyNotes = notes || '';
+            dailyNotesEl.value = dailyNotes;
+        });
+}
+
+
+function loadHistoryData(date) {
+    const dataBox = document.getElementById('history-content');
+    dataBox.innerHTML = '<p class="text-gray-500">Loading...</p>';
+
+    Promise.all([
+        fetch(`load_notes.php?user_id=${userId}&date=${date}`).then(res => res.text()),
+        fetch(`load_tasks.php?user_id=${userId}&date=${date}`).then(res => res.json())
+    ])
+    .then(([notes, tasks]) => {
+        let html = '';
+
+        if (tasks.length > 0) {
+            html += '<div><h3 class="font-semibold text-gray-800 mb-1">Completed Tasks:</h3><ul class="list-disc list-inside text-gray-700">';
+            tasks.forEach(t => {
+                html += `<li><strong>${t.time}</strong> – ${t.task} (${t.type})</li>`;
+            });
+            html += '</ul></div>';
+        } else {
+            html += '<p class="text-gray-500">No completed tasks for this day.</p>';
+        }
+
+        if (notes) {
+            html += '<div class="mt-4"><h3 class="font-semibold text-gray-800 mb-1">Notes:</h3>';
+            html += `<p class="text-gray-700 whitespace-pre-line">${notes}</p></div>`;
+        }
+
+        dataBox.innerHTML = html;
+    })
+    .catch(() => {
+        dataBox.innerHTML = '<p class="text-red-500">Failed to load history data.</p>';
+    });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    const historyInput = document.getElementById("history-date");
+    if (historyInput) {
+        historyInput.addEventListener("change", () => {
+            const selectedDate = historyInput.value;
+            if (selectedDate) loadHistoryData(selectedDate);
+        });
+    }
+});
+
+</script>
+</body>
+</html>
