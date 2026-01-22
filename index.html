@@ -1084,7 +1084,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         function areBasicsComplete() {
-            const basicItems = getAllItems().filter(item => item.isBasic || item.requiresPhoto);
+            const basicItems = getAllItems().filter(item => item.isBasic);
             if (basicItems.length === 0) {
                 return true;
             }
