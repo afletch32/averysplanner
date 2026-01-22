@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Schedule & Chore Tracker</title>
+    <title>My Schedule & Allowance Adventure</title>
     <script src="https://cdn.tailwindcss.com">
 const userId = 1;
 
@@ -59,6 +59,15 @@ function loadDailyNotes() {
         });
 }
 
+function formatTaskType(type) {
+    const labels = {
+        focus: 'Focus Block',
+        break: 'Break',
+        chore: 'Mission',
+        personal: 'Personal'
+    };
+    return labels[type] || type;
+}
 
 function loadHistoryData(date) {
     const dataBox = document.getElementById('history-content');
@@ -74,7 +83,7 @@ function loadHistoryData(date) {
         if (tasks.length > 0) {
             html += '<div><h3 class="font-semibold text-gray-800 mb-1">Completed Tasks:</h3><ul class="list-disc list-inside text-gray-700">';
             tasks.forEach(t => {
-                html += `<li><strong>${t.time}</strong> – ${t.task} (${t.type})</li>`;
+                html += `<li><strong>${t.time}</strong> – ${t.task} (${formatTaskType(t.type)})</li>`;
             });
             html += '</ul></div>';
         } else {
@@ -161,19 +170,25 @@ document.addEventListener("DOMContentLoaded", () => {
         <!-- Header -->
         <div class="flex flex-col md:flex-row justify-between items-center mb-8">
             <div>
-                <h1 class="text-3xl md:text-4xl font-bold text-blue-600">My Daily Schedule</h1>
+                <div class="flex flex-wrap items-center gap-2">
+                    <h1 class="text-3xl md:text-4xl font-bold text-blue-600">My Daily Adventure</h1>
+                    <span class="inline-flex items-center rounded-full bg-yellow-100 px-3 py-1 text-sm font-semibold text-yellow-800">✨ Allowance Quest</span>
+                </div>
                 <p class="text-gray-600" id="current-date">Loading date...</p>
             </div>
-            <div class="mt-4 md:mt-0 bg-white p-4 rounded-lg shadow-md">
-                <p class="text-xl font-bold text-center" id="current-time">Loading time...</p>
-                <p class="text-sm text-gray-500 text-center">Current Time</p>
+            <div class="mt-4 md:mt-0 flex flex-col items-end gap-2">
+                <button id="admin-toggle" class="text-sm text-blue-600 hover:text-blue-800 underline">Admin Sign In</button>
+                <div class="bg-white p-4 rounded-lg shadow-md">
+                    <p class="text-xl font-bold text-center" id="current-time">Loading time...</p>
+                    <p class="text-sm text-gray-500 text-center">Current Time</p>
+                </div>
             </div>
         </div>
 
         <!-- Progress Bar -->
         <div class="mb-8">
             <div class="flex justify-between mb-2">
-                <span class="text-sm font-medium text-blue-700">Daily Progress</span>
+                <span class="text-sm font-medium text-blue-700">Adventure Progress</span>
                 <span class="text-sm font-medium text-blue-700" id="progress-text">0%</span>
             </div>
             <div class="w-full bg-gray-200 rounded-full h-4">
@@ -184,19 +199,19 @@ document.addEventListener("DOMContentLoaded", () => {
         <!-- Tabs -->
         <div class="mb-6">
             <div class="flex border-b border-gray-200">
-                <button class="tab-btn py-2 px-4 font-semibold border-b-2 border-blue-500 text-blue-600" data-tab="schedule">Daily Schedule</button>
-                <button class="tab-btn py-2 px-4 font-semibold text-gray-500 hover:text-gray-700" data-tab="weekly">Weekly Chores</button>
-                <button class="tab-btn py-2 px-4 font-semibold text-gray-500 hover:text-gray-700" data-tab="monthly">Monthly Chores</button>
-                <button class="tab-btn py-2 px-4 font-semibold text-gray-500 hover:text-gray-700" data-tab="rewards">Rewards</button>
+                <button class="tab-btn py-2 px-4 font-semibold border-b-2 border-blue-500 text-blue-600" data-tab="schedule">Daily Adventure</button>
+                <button class="tab-btn py-2 px-4 font-semibold text-gray-500 hover:text-gray-700" data-tab="weekly">Weekly Missions</button>
+                <button class="tab-btn py-2 px-4 font-semibold text-gray-500 hover:text-gray-700" data-tab="monthly">Monthly Missions</button>
+                <button class="tab-btn py-2 px-4 font-semibold text-gray-500 hover:text-gray-700" data-tab="rewards">Allowance & Rewards</button>
             </div>
         </div>
 
         <!-- Schedule Tab Content -->
         <div id="schedule-tab" class="tab-content">
             <div class="flex justify-between mb-4">
-                <h2 class="text-xl font-bold text-gray-800">Today's Schedule</h2>
-                <button id="edit-schedule" class="bg-blue-100 text-blue-600 px-3 py-1 rounded-md hover:bg-blue-200 transition">
-                    Edit Schedule
+                <h2 class="text-xl font-bold text-gray-800">Today's Adventure</h2>
+                <button id="edit-schedule" class="admin-only bg-blue-100 text-blue-600 px-3 py-1 rounded-md hover:bg-blue-200 transition">
+                    Edit Adventure
                 </button>
             </div>
             <div id="schedule-container" class="space-y-3"></div>
@@ -211,12 +226,12 @@ document.addEventListener("DOMContentLoaded", () => {
             </div>
         </div>
 
-        <!-- Weekly Chores Tab Content -->
+        <!-- Weekly Missions Tab Content -->
         <div id="weekly-tab" class="tab-content hidden">
             <div class="flex justify-between mb-4">
-                <h2 class="text-xl font-bold text-gray-800">Weekly Chores</h2>
-                <button id="add-weekly-chore" class="bg-green-100 text-green-600 px-3 py-1 rounded-md hover:bg-green-200 transition">
-                    Add Chore
+                <h2 class="text-xl font-bold text-gray-800">Weekly Missions</h2>
+                <button id="add-weekly-chore" class="admin-only bg-green-100 text-green-600 px-3 py-1 rounded-md hover:bg-green-200 transition">
+                    Add Mission
                 </button>
             </div>
             <div class="grid grid-cols-1 gap-4" id="weekly-container">
@@ -224,12 +239,12 @@ document.addEventListener("DOMContentLoaded", () => {
             </div>
         </div>
 
-        <!-- Monthly Chores Tab Content -->
+        <!-- Monthly Missions Tab Content -->
         <div id="monthly-tab" class="tab-content hidden">
             <div class="flex justify-between mb-4">
-                <h2 class="text-xl font-bold text-gray-800">Monthly Chores</h2>
-                <button id="add-monthly-chore" class="bg-purple-100 text-purple-600 px-3 py-1 rounded-md hover:bg-purple-200 transition">
-                    Add Chore
+                <h2 class="text-xl font-bold text-gray-800">Monthly Missions</h2>
+                <button id="add-monthly-chore" class="admin-only bg-purple-100 text-purple-600 px-3 py-1 rounded-md hover:bg-purple-200 transition">
+                    Add Mission
                 </button>
             </div>
             <div class="grid grid-cols-1 gap-4" id="monthly-container">
@@ -240,22 +255,26 @@ document.addEventListener("DOMContentLoaded", () => {
         <!-- Rewards Tab Content -->
         <div id="rewards-tab" class="tab-content hidden">
             <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-bold text-gray-800">Points & Rewards</h2>
+                <h2 class="text-xl font-bold text-gray-800">Allowance & Rewards</h2>
                 <button id="point-settings" class="bg-blue-100 text-blue-600 px-3 py-1 rounded-md hover:bg-blue-200 transition">
-                    Point Settings
+                    Allowance Settings
                 </button>
             </div>
             
             <div id="points-display-container" class="bg-gradient-to-r from-purple-100 to-pink-100 p-6 rounded-lg shadow-md mb-6">
-                <h2 class="text-xl font-bold text-purple-800 mb-2">Your Points: <span id="points-display">0</span></h2>
+                <h2 class="text-xl font-bold text-purple-800 mb-2">Allowance Stars: <span id="points-display">0</span></h2>
                 <div class="w-full bg-white rounded-full h-4 mb-2">
                     <div class="bg-purple-600 h-4 rounded-full transition-all duration-500" id="points-progress" style="width: 0%"></div>
                 </div>
-                <p class="text-sm text-purple-700">Keep completing tasks to earn rewards!</p>
+                <div class="flex flex-wrap items-center justify-between gap-2 text-sm text-purple-700">
+                    <span>Collect stars to trade for rewards!</span>
+                    <span class="font-semibold text-amber-700">Pending approval: <span id="pending-points-display">0</span> ⭐</span>
+                </div>
+                <p class="text-xs text-purple-600 mt-2">Homework rewards stay pending until a parent approves the photo proof.</p>
             </div>
             
             <div class="flex justify-between mb-4">
-                <h3 class="text-lg font-bold text-gray-800">Available Rewards</h3>
+                <h3 class="text-lg font-bold text-gray-800">Reward Shop</h3>
                 <button id="add-reward" class="bg-purple-100 text-purple-600 px-3 py-1 rounded-md hover:bg-purple-200 transition">
                     Add Reward
                 </button>
@@ -267,7 +286,7 @@ document.addEventListener("DOMContentLoaded", () => {
         <div id="edit-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
             <div class="bg-white rounded-lg p-6 w-full max-w-md max-h-[80vh] overflow-y-auto">
                 <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-xl font-bold text-gray-800">Edit Schedule</h3>
+                    <h3 class="text-xl font-bold text-gray-800">Edit Adventure</h3>
                     <button id="close-modal" class="text-gray-500 hover:text-gray-700">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -286,11 +305,11 @@ document.addEventListener("DOMContentLoaded", () => {
             </div>
         </div>
 
-        <!-- Add Chore Modal -->
+        <!-- Add Mission Modal -->
         <div id="chore-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
             <div class="bg-white rounded-lg p-6 w-full max-w-md">
                 <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-xl font-bold text-gray-800" id="chore-modal-title">Add New Chore</h3>
+                    <h3 class="text-xl font-bold text-gray-800" id="chore-modal-title">Add New Mission</h3>
                     <button id="close-chore-modal" class="text-gray-500 hover:text-gray-700">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -299,12 +318,26 @@ document.addEventListener("DOMContentLoaded", () => {
                 </div>
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-gray-700 mb-1">Chore Name</label>
+                        <label class="block text-gray-700 mb-1">Mission Name</label>
                         <input type="text" id="chore-name" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div id="chore-points-container">
-                        <label class="block text-gray-700 mb-1">Points</label>
+                        <label class="block text-gray-700 mb-1">Stars</label>
                         <input type="number" id="chore-points" min="1" value="5" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="flex items-center text-gray-700 mb-1">
+                            <input type="checkbox" id="chore-requires-photo" class="mr-2">
+                            Requires photo proof
+                        </label>
+                        <p class="text-xs text-gray-500">Upload a photo or screenshot for approval.</p>
+                    </div>
+                    <div>
+                        <label class="flex items-center text-gray-700 mb-1">
+                            <input type="checkbox" id="chore-basic" class="mr-2">
+                            Basic requirement (unlocks paid tasks)
+                        </label>
+                        <p class="text-xs text-gray-500">Complete this before stars can be released.</p>
                     </div>
                     <div id="chore-day-container" class="hidden">
                         <label class="block text-gray-700 mb-1">Day</label>
@@ -330,7 +363,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 </div>
                 <div class="mt-6">
                     <button id="save-chore" class="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition">
-                        Add Chore
+                        Add Mission
                     </button>
                 </div>
             </div>
@@ -353,7 +386,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         <input type="text" id="reward-name" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div>
-                        <label class="block text-gray-700 mb-1">Points Required</label>
+                        <label class="block text-gray-700 mb-1">Stars Required</label>
                         <input type="number" id="reward-points" min="1" value="20" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div>
@@ -373,7 +406,7 @@ document.addEventListener("DOMContentLoaded", () => {
         <div id="points-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
             <div class="bg-white rounded-lg p-6 w-full max-w-md">
                 <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-xl font-bold text-gray-800">Point Settings</h3>
+                    <h3 class="text-xl font-bold text-gray-800">Allowance Settings</h3>
                     <button id="close-points-modal" class="text-gray-500 hover:text-gray-700">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -383,35 +416,35 @@ document.addEventListener("DOMContentLoaded", () => {
                 <div class="space-y-6">
                     <div>
                         <div class="flex items-center justify-between mb-2">
-                            <span class="text-gray-700 font-medium">Enable Points System</span>
+                            <span class="text-gray-700 font-medium">Enable Allowance Stars</span>
                             <div class="relative inline-block w-12 align-middle select-none">
                                 <input type="checkbox" id="points-toggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer" checked />
                                 <label for="points-toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
                             </div>
                         </div>
-                        <p class="text-sm text-gray-500">Turn off to hide points and rewards but still track task completion.</p>
+                        <p class="text-sm text-gray-500">Turn off to hide stars and rewards but still track mission completion.</p>
                     </div>
                     
                     <div id="point-values-container">
-                        <h4 class="font-semibold text-gray-700 mb-2">Default Point Values</h4>
+                        <h4 class="font-semibold text-gray-700 mb-2">Default Star Values</h4>
                         <div class="space-y-3">
                             <div class="flex items-center justify-between">
-                                <label class="text-gray-600">Daily Schedule Tasks</label>
+                                <label class="text-gray-600">Daily Adventure Tasks</label>
                                 <input type="number" id="daily-task-points" min="0" value="5" class="w-20 border border-gray-300 rounded-md px-2 py-1 text-center">
                             </div>
                             <div class="flex items-center justify-between">
-                                <label class="text-gray-600">Weekly Chores</label>
+                                <label class="text-gray-600">Weekly Missions</label>
                                 <input type="number" id="weekly-chore-points" min="0" value="10" class="w-20 border border-gray-300 rounded-md px-2 py-1 text-center">
                             </div>
                             <div class="flex items-center justify-between">
-                                <label class="text-gray-600">Monthly Chores</label>
+                                <label class="text-gray-600">Monthly Missions</label>
                                 <input type="number" id="monthly-chore-points" min="0" value="20" class="w-20 border border-gray-300 rounded-md px-2 py-1 text-center">
                             </div>
                         </div>
                     </div>
                     
                     <div>
-                        <button id="reset-points" class="text-red-600 hover:text-red-800 text-sm">Reset all points to zero</button>
+                    <button id="reset-points" class="text-red-600 hover:text-red-800 text-sm">Reset all stars to zero</button>
                     </div>
                 </div>
                 <div class="mt-6">
@@ -463,27 +496,84 @@ document.addEventListener("DOMContentLoaded", () => {
             </div>
         </div>
 
+        <!-- Proof Upload Modal -->
+        <div id="proof-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg p-6 w-full max-w-md">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold text-gray-800" id="proof-modal-title">Upload Proof</h3>
+                    <button id="close-proof-modal" class="text-gray-500 hover:text-gray-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <p class="text-sm text-gray-600 mb-4" id="proof-modal-description">Add a photo or screenshot to request approval.</p>
+                <div class="space-y-4">
+                    <input type="file" id="proof-file" accept="image/*" class="w-full">
+                    <div id="proof-preview-wrapper" class="hidden">
+                        <p class="text-sm text-gray-600 mb-2">Preview</p>
+                        <img id="proof-preview" class="w-full rounded-md border border-gray-200" alt="Proof preview">
+                    </div>
+                </div>
+                <div class="mt-6 flex gap-2">
+                    <button id="submit-proof" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        Submit for Approval
+                    </button>
+                    <button id="cancel-proof" class="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Login Modal -->
+        <div id="admin-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg p-6 w-full max-w-md">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold text-gray-800">Admin Access</h3>
+                    <button id="close-admin-modal" class="text-gray-500 hover:text-gray-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <p class="text-sm text-gray-600 mb-4">Enter the parent/admin passcode to manage tasks and approvals.</p>
+                <div class="space-y-4">
+                    <input type="password" id="admin-passcode" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Passcode">
+                    <p id="admin-error" class="text-sm text-red-600 hidden">Incorrect passcode. Try again.</p>
+                </div>
+                <div class="mt-6 flex gap-2">
+                    <button id="admin-login" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition">
+                        Unlock Admin
+                    </button>
+                    <button id="admin-cancel" class="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <script>
         // Initial data
         let scheduleItems = [
-            { id: 1, time: '08:00', task: 'Wake up, make bed, Brush teeth', completed: false, type: 'personal', points: 5 },
-            { id: 2, time: '08:30', task: 'Eat breakfast, Refill dog bowls (AM), Tidy room', completed: false, type: 'chore', points: 5 },
-            { id: 3, time: '09:00', task: 'Focus Block 1: Schoolwork', completed: false, type: 'focus', endTime: '11:00', points: 5 },
+            { id: 1, time: '08:00', task: 'Wake up, make bed, Brush teeth', completed: false, type: 'personal', points: 5, isBasic: true },
+            { id: 2, time: '08:30', task: 'Eat breakfast, Refill dog bowls (AM), Tidy room', completed: false, type: 'chore', points: 5, isBasic: true },
+            { id: 3, time: '09:00', task: 'Focus Block 1: Schoolwork', completed: false, type: 'focus', endTime: '11:00', points: 5, requiresPhoto: true },
             { id: 4, time: '11:00', task: 'Movement break (walk/stretch)', completed: false, type: 'break', endTime: '11:15', points: 5 },
-            { id: 5, time: '11:15', task: 'Focus Block 2: Schoolwork', completed: false, type: 'focus', endTime: '13:15', points: 5 },
+            { id: 5, time: '11:15', task: 'Focus Block 2: Schoolwork', completed: false, type: 'focus', endTime: '13:15', points: 5, requiresPhoto: true },
             { id: 6, time: '13:15', task: 'Lunch break', completed: false, type: 'break', endTime: '13:45', hasMealInput: true, points: 5 },
-            { id: 7, time: '13:45', task: 'Dishes and kitchen cleanup', completed: false, type: 'chore', endTime: '14:15', points: 5 },
-            { id: 8, time: '14:15', task: 'Focus Block 3: Schoolwork', completed: false, type: 'focus', endTime: '16:15', points: 5 },
+            { id: 7, time: '13:45', task: 'Dishes and kitchen cleanup', completed: false, type: 'chore', endTime: '14:15', points: 5, isBasic: true },
+            { id: 8, time: '14:15', task: 'Focus Block 3: Schoolwork', completed: false, type: 'focus', endTime: '16:15', points: 5, requiresPhoto: true },
             { id: 9, time: '16:15', task: 'Free time / hobby', completed: false, type: 'personal', endTime: '17:15', points: 5 },
-            { id: 10, time: '17:15', task: 'Clean up bedroom, Help with laundry', completed: false, type: 'chore', endTime: '18:15', points: 5 },
+            { id: 10, time: '17:15', task: 'Clean up bedroom, Help with laundry', completed: false, type: 'chore', endTime: '18:15', points: 5, isBasic: true },
             { id: 11, time: '18:30', task: 'Dinner, Refill dog bowls (PM)', completed: false, type: 'personal', endTime: '19:30', points: 5 },
-            { id: 12, time: '19:30', task: 'Shower, Clean room, Clean dog bowls (Saturday)', completed: false, type: 'chore', endTime: '20:30', points: 5 },
+            { id: 12, time: '19:30', task: 'Shower, Clean room, Clean dog bowls (Saturday)', completed: false, type: 'chore', endTime: '20:30', points: 5, isBasic: true },
             { id: 13, time: '20:30', task: 'Snack & relax with Mom/Mimi', completed: false, type: 'personal', endTime: '21:30', points: 5 },
             { id: 14, time: '21:30', task: 'Wash face, Brush teeth, Wipe bathroom counter, Take medicine', completed: false, type: 'personal', endTime: '22:00', points: 5 },
             { id: 15, time: '22:00', task: 'Electronics off, wind down', completed: false, type: 'personal', endTime: '22:30', points: 5 },
-            { id: 16, time: '22:30', task: 'Bedtime', completed: false, type: 'personal', points: 5 }
+            { id: 16, time: '22:30', task: 'Bedtime', completed: false, type: 'personal', points: 5, isBasic: true }
         ];
 
         let weeklyChores = [
@@ -525,6 +615,9 @@ document.addEventListener("DOMContentLoaded", () => {
         };
 
         let userPoints = 0;
+        let pendingPoints = 0;
+        let isAdmin = false;
+        const adminPasscode = '1234';
         const maxPoints = 200;
         let dailyNotes = '';
         let mealNotes = '';
@@ -540,6 +633,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const rewardsContainer = document.getElementById('rewards-container');
         const pointsDisplay = document.getElementById('points-display');
         const pointsProgress = document.getElementById('points-progress');
+        const pendingPointsDisplay = document.getElementById('pending-points-display');
         const pointsDisplayContainer = document.getElementById('points-display-container');
         const editModal = document.getElementById('edit-modal');
         const choreModal = document.getElementById('chore-modal');
@@ -549,6 +643,16 @@ document.addEventListener("DOMContentLoaded", () => {
         const celebrationModal = document.getElementById('celebration-modal');
         const celebrationMessage = document.getElementById('celebration-message');
         const dailyNotesEl = document.getElementById('daily-notes');
+        const proofModal = document.getElementById('proof-modal');
+        const proofModalTitle = document.getElementById('proof-modal-title');
+        const proofModalDescription = document.getElementById('proof-modal-description');
+        const proofFileInput = document.getElementById('proof-file');
+        const proofPreviewWrapper = document.getElementById('proof-preview-wrapper');
+        const proofPreview = document.getElementById('proof-preview');
+        const adminModal = document.getElementById('admin-modal');
+        const adminPasscodeInput = document.getElementById('admin-passcode');
+        const adminError = document.getElementById('admin-error');
+        const adminToggle = document.getElementById('admin-toggle');
 
         // Tab functionality
         const tabButtons = document.querySelectorAll('.tab-btn');
@@ -592,6 +696,16 @@ document.addEventListener("DOMContentLoaded", () => {
             const ampm = hour >= 12 ? 'PM' : 'AM';
             const formattedHour = hour % 12 || 12;
             return `${formattedHour}:${minutes} ${ampm}`;
+        }
+
+        function formatTaskType(type) {
+            const labels = {
+                focus: 'Focus Block',
+                break: 'Break',
+                chore: 'Mission',
+                personal: 'Personal'
+            };
+            return labels[type] || type;
         }
 
         function updateDateTime() {
@@ -650,6 +764,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         function updatePointsDisplay() {
             pointsDisplay.textContent = userPoints;
+            pendingPointsDisplay.textContent = pendingPoints;
             const percentage = Math.min((userPoints / maxPoints) * 100, 100);
             pointsProgress.style.width = `${percentage}%`;
             
@@ -683,6 +798,98 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
 
+        function getItemByType(type, id) {
+            if (type === 'schedule') {
+                return scheduleItems.find(item => item.id === id);
+            }
+            if (type === 'weekly') {
+                return weeklyChores.find(item => item.id === id);
+            }
+            if (type === 'monthly') {
+                return monthlyChores.find(item => item.id === id);
+            }
+            return null;
+        }
+
+        function getAllItems() {
+            return [...scheduleItems, ...weeklyChores, ...monthlyChores];
+        }
+
+        function areBasicsComplete() {
+            const basicItems = getAllItems().filter(item => item.isBasic || item.requiresPhoto);
+            if (basicItems.length === 0) {
+                return true;
+            }
+            return basicItems.every(item => item.completed && !item.pendingApproval);
+        }
+
+        function releasePendingRewards() {
+            if (!areBasicsComplete()) {
+                return;
+            }
+
+            getAllItems().forEach(item => {
+                if (item.pendingRelease && item.completed && !item.pendingApproval) {
+                    pendingPoints = Math.max(0, pendingPoints - item.points);
+                    userPoints += item.points;
+                    item.pendingRelease = false;
+                }
+            });
+            updatePointsDisplay();
+        }
+
+        function requestApproval(item) {
+            item.pendingApproval = true;
+            item.completed = false;
+            if (settings.pointsEnabled) {
+                pendingPoints += item.points;
+                updatePointsDisplay();
+            }
+        }
+
+        function approveTask(item, label) {
+            item.pendingApproval = false;
+            item.completed = true;
+            if (settings.pointsEnabled) {
+                if (areBasicsComplete()) {
+                    pendingPoints = Math.max(0, pendingPoints - item.points);
+                    userPoints += item.points;
+                    updatePointsDisplay();
+                    showCelebration(`"${label}" approved! Stars added to balance.`);
+                } else {
+                    item.pendingRelease = true;
+                    showCelebration(`"${label}" approved! Stars are pending until basics are done.`);
+                }
+            } else {
+                showCelebration(`"${label}" approved!`);
+            }
+            releasePendingRewards();
+        }
+
+        function denyTask(item, label) {
+            item.pendingApproval = false;
+            item.completed = false;
+            item.proofImage = '';
+            item.pendingRelease = false;
+            if (settings.pointsEnabled) {
+                pendingPoints = Math.max(0, pendingPoints - item.points);
+                updatePointsDisplay();
+            }
+            showCelebration(`"${label}" needs another try. Please upload a new photo.`);
+        }
+
+        function openProofModal({ type, item }) {
+            proofModal.dataset.type = type;
+            proofModal.dataset.itemId = item.id;
+            proofModalTitle.textContent = `Upload Proof for "${item.task}"`;
+            proofModalDescription.textContent = 'Add a photo or screenshot to request approval.';
+            proofFileInput.value = '';
+            proofPreviewWrapper.classList.add('hidden');
+            proofPreview.src = '';
+            document.getElementById('submit-proof').disabled = true;
+            proofModal.classList.remove('hidden');
+        }
+
         function renderSchedule() {
             scheduleContainer.innerHTML = '';
             
@@ -701,9 +908,44 @@ document.addEventListener("DOMContentLoaded", () => {
                 
                 let pointsDisplay = '';
                 if (settings.pointsEnabled) {
-                    pointsDisplay = `<span class="text-xs font-semibold text-blue-600 ml-2">+${item.points} pts</span>`;
+                    pointsDisplay = `<span class="text-xs font-semibold text-blue-600 ml-2">+${item.points} ⭐</span>`;
                 }
-                
+
+                let statusLabel = '';
+                let approvalActions = '';
+                let proofPreviewHtml = '';
+                const isPending = item.pendingApproval;
+                const isPendingRelease = item.pendingRelease;
+                const isBasic = item.isBasic;
+
+                if (item.requiresPhoto) {
+                    if (isPending) {
+                        statusLabel = '<span class="ml-2 text-xs font-semibold text-amber-600">Pending approval</span>';
+                        approvalActions = `
+                            <div class="flex items-center gap-2 ml-3">
+                                <button class="approve-task text-xs bg-emerald-500 text-white px-2 py-1 rounded-md hover:bg-emerald-600">Approve</button>
+                                <button class="deny-task text-xs bg-rose-100 text-rose-600 px-2 py-1 rounded-md hover:bg-rose-200">Deny</button>
+                            </div>
+                        `;
+                    } else if (item.completed) {
+                        statusLabel = '<span class="ml-2 text-xs font-semibold text-emerald-600">Approved</span>';
+                    } else {
+                        statusLabel = '<span class="ml-2 text-xs font-semibold text-gray-500">Photo required</span>';
+                    }
+                }
+
+                if (isPendingRelease) {
+                    statusLabel += '<span class="ml-2 text-xs font-semibold text-amber-600">Pending basics</span>';
+                }
+
+                if (isBasic) {
+                    statusLabel += '<span class="ml-2 text-xs font-semibold text-blue-600">Basic</span>';
+                }
+
+                if (item.proofImage) {
+                    proofPreviewHtml = `<div class="mt-2"><img src="${item.proofImage}" alt="Proof preview" class="w-28 rounded-md border border-gray-200"></div>`;
+                }
+
                 itemEl.innerHTML = `
                     <div class="flex-shrink-0 w-24 text-center">
                         <span class="font-semibold text-gray-700">${timeDisplay}</span>
@@ -712,13 +954,16 @@ document.addEventListener("DOMContentLoaded", () => {
                         <div class="flex items-center">
                             <p class="text-gray-800">${item.task}</p>
                             ${pointsDisplay}
+                            ${statusLabel}
                         </div>
                         ${item.hasMealInput && item.completed && mealNotes ? `<p class="text-sm text-gray-600 mt-1">Ate: ${mealNotes}</p>` : ''}
+                        ${proofPreviewHtml}
                     </div>
-                    <div class="flex-shrink-0 ml-2">
-                        <button class="complete-task w-6 h-6 rounded-full border-2 border-blue-500 flex items-center justify-center ${item.completed ? 'bg-blue-500' : ''}">
+                    <div class="flex-shrink-0 ml-2 flex items-center">
+                        <button class="complete-task w-6 h-6 rounded-full border-2 border-blue-500 flex items-center justify-center ${item.completed ? 'bg-blue-500' : ''} ${isPending ? 'opacity-50 cursor-not-allowed' : ''}" ${isPending ? 'aria-disabled="true"' : ''}>
                             ${item.completed ? '<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>' : ''}
                         </button>
+                        ${isAdmin ? approvalActions : ''}
                     </div>
                 `;
                 
@@ -727,7 +972,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 // Add event listener to complete button
                 const completeBtn = itemEl.querySelector('.complete-task');
                 completeBtn.addEventListener('click', () => {
+                    if (item.pendingApproval) {
+                        showCelebration(`"${item.task}" is waiting for approval.`);
+                        return;
+                    }
                     if (!item.completed) {
+                        if (item.requiresPhoto) {
+                            openProofModal({ type: 'schedule', item });
+                            return;
+                        }
                         if (item.hasMealInput) {
                             // Show meal input modal
                             document.getElementById('meal-notes').value = mealNotes;
@@ -738,14 +991,22 @@ document.addEventListener("DOMContentLoaded", () => {
                         } else {
                             item.completed = true;
                             if (settings.pointsEnabled) {
-                                userPoints += item.points;
-                                updatePointsDisplay();
-                                showCelebration(`You completed "${item.task}"! +${item.points} points`);
+                                if (areBasicsComplete()) {
+                                    userPoints += item.points;
+                                    updatePointsDisplay();
+                                    showCelebration(`You completed "${item.task}"! +${item.points} stars`);
+                                } else {
+                                    item.pendingRelease = true;
+                                    pendingPoints += item.points;
+                                    updatePointsDisplay();
+                                    showCelebration(`You completed "${item.task}"! Stars are pending until basics are done.`);
+                                }
                             } else {
                                 showCelebration(`You completed "${item.task}"!`);
                             }
                             renderSchedule();
                             updateProgress();
+                            releasePendingRewards();
                         }
                     } else {
                         item.completed = false;
@@ -753,16 +1014,38 @@ document.addEventListener("DOMContentLoaded", () => {
                             userPoints = Math.max(0, userPoints - item.points);
                             updatePointsDisplay();
                         }
+                        if (item.pendingRelease) {
+                            pendingPoints = Math.max(0, pendingPoints - item.points);
+                            item.pendingRelease = false;
+                            updatePointsDisplay();
+                        }
+                        item.proofImage = '';
                         renderSchedule();
                         updateProgress();
                     }
                 });
+
+                if (item.pendingApproval && isAdmin) {
+                    const approveBtn = itemEl.querySelector('.approve-task');
+                    const denyBtn = itemEl.querySelector('.deny-task');
+                    approveBtn.addEventListener('click', () => {
+                        approveTask(item, item.task);
+                        renderSchedule();
+                        updateProgress();
+                    });
+                    denyBtn.addEventListener('click', () => {
+                        denyTask(item, item.task);
+                        renderSchedule();
+                        updateProgress();
+                    });
+                }
             });
             
             updateCurrentTask();
             
             // Update daily notes textarea
             dailyNotesEl.value = dailyNotes;
+            updateAdminVisibility();
         }
 
         function renderWeeklyChores() {
@@ -799,24 +1082,61 @@ document.addEventListener("DOMContentLoaded", () => {
                         
                         let pointsDisplay = '';
                         if (settings.pointsEnabled) {
-                            pointsDisplay = `<span class="text-green-600 font-semibold text-sm">+${chore.points} pts</span>`;
+                            pointsDisplay = `<span class="text-green-600 font-semibold text-sm">+${chore.points} ⭐</span>`;
+                        }
+
+                        let statusLabel = '';
+                        let approvalActions = '';
+                        let proofPreviewHtml = '';
+                        const isPending = chore.pendingApproval;
+                        const isPendingRelease = chore.pendingRelease;
+                        const isBasic = chore.isBasic;
+
+                        if (chore.requiresPhoto) {
+                            if (isPending) {
+                                statusLabel = '<span class="ml-2 text-xs font-semibold text-amber-600">Pending approval</span>';
+                                approvalActions = `
+                                    <div class="flex items-center gap-2 ml-3">
+                                        <button class="approve-task text-xs bg-emerald-500 text-white px-2 py-1 rounded-md hover:bg-emerald-600">Approve</button>
+                                        <button class="deny-task text-xs bg-rose-100 text-rose-600 px-2 py-1 rounded-md hover:bg-rose-200">Deny</button>
+                                    </div>
+                                `;
+                            } else if (chore.completed) {
+                                statusLabel = '<span class="ml-2 text-xs font-semibold text-emerald-600">Approved</span>';
+                            } else {
+                                statusLabel = '<span class="ml-2 text-xs font-semibold text-gray-500">Photo required</span>';
+                            }
+                        }
+
+                        if (isPendingRelease) {
+                            statusLabel += '<span class="ml-2 text-xs font-semibold text-amber-600">Pending basics</span>';
+                        }
+
+                        if (isBasic) {
+                            statusLabel += '<span class="ml-2 text-xs font-semibold text-blue-600">Basic</span>';
+                        }
+
+                        if (chore.proofImage) {
+                            proofPreviewHtml = `<div class="ml-3"><img src="${chore.proofImage}" alt="Proof preview" class="w-16 rounded-md border border-gray-200"></div>`;
                         }
                         
                         choreEl.innerHTML = `
-                            <button class="complete-chore w-6 h-6 rounded-full border-2 border-green-500 flex items-center justify-center ${chore.completed ? 'bg-green-500' : ''}">
+                            <button class="complete-chore w-6 h-6 rounded-full border-2 border-green-500 flex items-center justify-center ${chore.completed ? 'bg-green-500' : ''} ${isPending ? 'opacity-50 cursor-not-allowed' : ''}" ${isPending ? 'aria-disabled="true"' : ''}>
                                 ${chore.completed ? '<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>' : ''}
                             </button>
-                            <span class="ml-3 flex-grow">${chore.task}</span>
+                            <span class="ml-3 flex-grow">${chore.task} ${statusLabel}</span>
                             ${pointsDisplay}
-                            <div class="flex items-center">
+                            ${proofPreviewHtml}
+                            ${isAdmin ? approvalActions : ''}
+                            <div class="flex items-center ml-2">
                                 ${settings.pointsEnabled ? `
-                                <button class="edit-chore-points mr-2 text-blue-500 hover:text-blue-700">
+                                <button class="admin-only edit-chore-points mr-2 text-blue-500 hover:text-blue-700">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                                     </svg>
                                 </button>
                                 ` : ''}
-                                <button class="delete-chore text-red-500 hover:text-red-700">
+                                <button class="admin-only delete-chore text-red-500 hover:text-red-700">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                                     </svg>
@@ -829,30 +1149,65 @@ document.addEventListener("DOMContentLoaded", () => {
                         // Add event listeners
                         const completeBtn = choreEl.querySelector('.complete-chore');
                         completeBtn.addEventListener('click', () => {
+                            if (chore.pendingApproval) {
+                                showCelebration(`"${chore.task}" is waiting for approval.`);
+                                return;
+                            }
                             if (!chore.completed) {
-                                chore.completed = true;
-                                if (settings.pointsEnabled) {
-                                    userPoints += chore.points;
-                                    updatePointsDisplay();
-                                    showCelebration(`You completed "${chore.task}"! +${chore.points} points`);
+                                if (chore.requiresPhoto) {
+                                    openProofModal({ type: 'weekly', item: chore });
                                 } else {
-                                    showCelebration(`You completed "${chore.task}"!`);
+                                    chore.completed = true;
+                                    if (settings.pointsEnabled) {
+                                        if (areBasicsComplete()) {
+                                            userPoints += chore.points;
+                                            updatePointsDisplay();
+                                            showCelebration(`You completed "${chore.task}"! +${chore.points} stars`);
+                                        } else {
+                                            chore.pendingRelease = true;
+                                            pendingPoints += chore.points;
+                                            updatePointsDisplay();
+                                            showCelebration(`You completed "${chore.task}"! Stars are pending until basics are done.`);
+                                        }
+                                    } else {
+                                        showCelebration(`You completed "${chore.task}"!`);
+                                    }
+                                    renderWeeklyChores();
+                                    releasePendingRewards();
                                 }
-                                renderWeeklyChores();
                             } else {
                                 chore.completed = false;
                                 if (settings.pointsEnabled) {
                                     userPoints = Math.max(0, userPoints - chore.points);
                                     updatePointsDisplay();
                                 }
+                                if (chore.pendingRelease) {
+                                    pendingPoints = Math.max(0, pendingPoints - chore.points);
+                                    chore.pendingRelease = false;
+                                    updatePointsDisplay();
+                                }
+                                chore.proofImage = '';
                                 renderWeeklyChores();
                             }
                         });
+
+                        if (chore.pendingApproval && isAdmin) {
+                            const approveBtn = choreEl.querySelector('.approve-task');
+                            const denyBtn = choreEl.querySelector('.deny-task');
+                            approveBtn.addEventListener('click', () => {
+                                approveTask(chore, chore.task);
+                                renderWeeklyChores();
+                            });
+                            denyBtn.addEventListener('click', () => {
+                                denyTask(chore, chore.task);
+                                renderWeeklyChores();
+                            });
+                        }
                         
-                        if (settings.pointsEnabled) {
+                        if (settings.pointsEnabled && isAdmin) {
                             const editPointsBtn = choreEl.querySelector('.edit-chore-points');
                             editPointsBtn.addEventListener('click', () => {
-                                const newPoints = prompt(`Enter new point value for "${chore.task}":`, chore.points);
+                                const newPoints = prompt(`Enter new star value for "${chore.task}":`, chore.points);
                                 if (newPoints !== null && !isNaN(newPoints) && newPoints >= 0) {
                                     chore.points = parseInt(newPoints);
                                     renderWeeklyChores();
@@ -860,14 +1215,17 @@ document.addEventListener("DOMContentLoaded", () => {
                             });
                         }
                         
-                        const deleteBtn = choreEl.querySelector('.delete-chore');
-                        deleteBtn.addEventListener('click', () => {
-                            weeklyChores = weeklyChores.filter(c => c.id !== chore.id);
-                            renderWeeklyChores();
-                        });
+                        if (isAdmin) {
+                            const deleteBtn = choreEl.querySelector('.delete-chore');
+                            deleteBtn.addEventListener('click', () => {
+                                weeklyChores = weeklyChores.filter(c => c.id !== chore.id);
+                                renderWeeklyChores();
+                            });
+                        }
                     });
                 }
             });
+            updateAdminVisibility();
         }
 
         function renderMonthlyChores() {
@@ -912,24 +1270,61 @@ document.addEventListener("DOMContentLoaded", () => {
                         
                         let pointsDisplay = '';
                         if (settings.pointsEnabled) {
-                            pointsDisplay = `<span class="text-purple-600 font-semibold text-sm">+${chore.points} pts</span>`;
+                            pointsDisplay = `<span class="text-purple-600 font-semibold text-sm">+${chore.points} ⭐</span>`;
+                        }
+
+                        let statusLabel = '';
+                        let approvalActions = '';
+                        let proofPreviewHtml = '';
+                        const isPending = chore.pendingApproval;
+                        const isPendingRelease = chore.pendingRelease;
+                        const isBasic = chore.isBasic;
+
+                        if (chore.requiresPhoto) {
+                            if (isPending) {
+                                statusLabel = '<span class="ml-2 text-xs font-semibold text-amber-600">Pending approval</span>';
+                                approvalActions = `
+                                    <div class="flex items-center gap-2 ml-3">
+                                        <button class="approve-task text-xs bg-emerald-500 text-white px-2 py-1 rounded-md hover:bg-emerald-600">Approve</button>
+                                        <button class="deny-task text-xs bg-rose-100 text-rose-600 px-2 py-1 rounded-md hover:bg-rose-200">Deny</button>
+                                    </div>
+                                `;
+                            } else if (chore.completed) {
+                                statusLabel = '<span class="ml-2 text-xs font-semibold text-emerald-600">Approved</span>';
+                            } else {
+                                statusLabel = '<span class="ml-2 text-xs font-semibold text-gray-500">Photo required</span>';
+                            }
+                        }
+
+                        if (isPendingRelease) {
+                            statusLabel += '<span class="ml-2 text-xs font-semibold text-amber-600">Pending basics</span>';
+                        }
+
+                        if (isBasic) {
+                            statusLabel += '<span class="ml-2 text-xs font-semibold text-blue-600">Basic</span>';
+                        }
+
+                        if (chore.proofImage) {
+                            proofPreviewHtml = `<div class="ml-3"><img src="${chore.proofImage}" alt="Proof preview" class="w-16 rounded-md border border-gray-200"></div>`;
                         }
                         
                         choreEl.innerHTML = `
-                            <button class="complete-chore w-6 h-6 rounded-full border-2 border-purple-500 flex items-center justify-center ${chore.completed ? 'bg-purple-500' : ''}">
+                            <button class="complete-chore w-6 h-6 rounded-full border-2 border-purple-500 flex items-center justify-center ${chore.completed ? 'bg-purple-500' : ''} ${isPending ? 'opacity-50 cursor-not-allowed' : ''}" ${isPending ? 'aria-disabled="true"' : ''}>
                                 ${chore.completed ? '<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>' : ''}
                             </button>
-                            <span class="ml-3 flex-grow">${chore.task}</span>
+                            <span class="ml-3 flex-grow">${chore.task} ${statusLabel}</span>
                             ${pointsDisplay}
-                            <div class="flex items-center">
+                            ${proofPreviewHtml}
+                            ${isAdmin ? approvalActions : ''}
+                            <div class="flex items-center ml-2">
                                 ${settings.pointsEnabled ? `
-                                <button class="edit-chore-points mr-2 text-blue-500 hover:text-blue-700">
+                                <button class="admin-only edit-chore-points mr-2 text-blue-500 hover:text-blue-700">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                                     </svg>
                                 </button>
                                 ` : ''}
-                                <button class="delete-chore text-red-500 hover:text-red-700">
+                                <button class="admin-only delete-chore text-red-500 hover:text-red-700">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                                     </svg>
@@ -942,30 +1337,65 @@ document.addEventListener("DOMContentLoaded", () => {
                         // Add event listeners
                         const completeBtn = choreEl.querySelector('.complete-chore');
                         completeBtn.addEventListener('click', () => {
+                            if (chore.pendingApproval) {
+                                showCelebration(`"${chore.task}" is waiting for approval.`);
+                                return;
+                            }
                             if (!chore.completed) {
-                                chore.completed = true;
-                                if (settings.pointsEnabled) {
-                                    userPoints += chore.points;
-                                    updatePointsDisplay();
-                                    showCelebration(`You completed "${chore.task}"! +${chore.points} points`);
+                                if (chore.requiresPhoto) {
+                                    openProofModal({ type: 'monthly', item: chore });
                                 } else {
-                                    showCelebration(`You completed "${chore.task}"!`);
+                                    chore.completed = true;
+                                    if (settings.pointsEnabled) {
+                                        if (areBasicsComplete()) {
+                                            userPoints += chore.points;
+                                            updatePointsDisplay();
+                                            showCelebration(`You completed "${chore.task}"! +${chore.points} stars`);
+                                        } else {
+                                            chore.pendingRelease = true;
+                                            pendingPoints += chore.points;
+                                            updatePointsDisplay();
+                                            showCelebration(`You completed "${chore.task}"! Stars are pending until basics are done.`);
+                                        }
+                                    } else {
+                                        showCelebration(`You completed "${chore.task}"!`);
+                                    }
+                                    renderMonthlyChores();
+                                    releasePendingRewards();
                                 }
-                                renderMonthlyChores();
                             } else {
                                 chore.completed = false;
                                 if (settings.pointsEnabled) {
                                     userPoints = Math.max(0, userPoints - chore.points);
                                     updatePointsDisplay();
                                 }
+                                if (chore.pendingRelease) {
+                                    pendingPoints = Math.max(0, pendingPoints - chore.points);
+                                    chore.pendingRelease = false;
+                                    updatePointsDisplay();
+                                }
+                                chore.proofImage = '';
                                 renderMonthlyChores();
                             }
                         });
+
+                        if (chore.pendingApproval && isAdmin) {
+                            const approveBtn = choreEl.querySelector('.approve-task');
+                            const denyBtn = choreEl.querySelector('.deny-task');
+                            approveBtn.addEventListener('click', () => {
+                                approveTask(chore, chore.task);
+                                renderMonthlyChores();
+                            });
+                            denyBtn.addEventListener('click', () => {
+                                denyTask(chore, chore.task);
+                                renderMonthlyChores();
+                            });
+                        }
                         
-                        if (settings.pointsEnabled) {
+                        if (settings.pointsEnabled && isAdmin) {
                             const editPointsBtn = choreEl.querySelector('.edit-chore-points');
                             editPointsBtn.addEventListener('click', () => {
-                                const newPoints = prompt(`Enter new point value for "${chore.task}":`, chore.points);
+                                const newPoints = prompt(`Enter new star value for "${chore.task}":`, chore.points);
                                 if (newPoints !== null && !isNaN(newPoints) && newPoints >= 0) {
                                     chore.points = parseInt(newPoints);
                                     renderMonthlyChores();
@@ -973,14 +1403,17 @@ document.addEventListener("DOMContentLoaded", () => {
                             });
                         }
                         
-                        const deleteBtn = choreEl.querySelector('.delete-chore');
-                        deleteBtn.addEventListener('click', () => {
-                            monthlyChores = monthlyChores.filter(c => c.id !== chore.id);
-                            renderMonthlyChores();
-                        });
+                        if (isAdmin) {
+                            const deleteBtn = choreEl.querySelector('.delete-chore');
+                            deleteBtn.addEventListener('click', () => {
+                                monthlyChores = monthlyChores.filter(c => c.id !== chore.id);
+                                renderMonthlyChores();
+                            });
+                        }
                     });
                 }
             });
+            updateAdminVisibility();
         }
 
         function renderRewards() {
@@ -989,8 +1422,8 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!settings.pointsEnabled) {
                 rewardsContainer.innerHTML = `
                     <div class="col-span-1 md:col-span-2 p-6 bg-gray-50 rounded-lg text-center">
-                        <p class="text-gray-600">Points system is currently disabled.</p>
-                        <p class="text-gray-600 mt-2">Enable points in Point Settings to use rewards.</p>
+                        <p class="text-gray-600">Allowance stars are currently disabled.</p>
+                        <p class="text-gray-600 mt-2">Enable stars in Allowance Settings to use rewards.</p>
                     </div>
                 `;
                 return;
@@ -1007,12 +1440,12 @@ document.addEventListener("DOMContentLoaded", () => {
                         <span class="text-3xl mr-3">${reward.icon}</span>
                         <div>
                             <h3 class="font-semibold text-gray-800">${reward.name}</h3>
-                            <p class="text-purple-600 text-sm font-bold">${reward.points} points</p>
+                            <p class="text-purple-600 text-sm font-bold">${reward.points} stars</p>
                         </div>
                     </div>
                     <div class="flex justify-between">
                         <button class="redeem-reward px-3 py-2 rounded-md ${canAfford ? 'bg-purple-600 text-white hover:bg-purple-700' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}" ${canAfford ? '' : 'disabled'}>
-                            ${canAfford ? 'Redeem Reward' : 'Not Enough Points'}
+                            ${canAfford ? 'Redeem Reward' : 'Not Enough Stars'}
                         </button>
                         <button class="delete-reward text-red-500 hover:text-red-700">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1080,12 +1513,26 @@ document.addEventListener("DOMContentLoaded", () => {
                         </div>
                     `;
                 }
+
+                const photoCheckbox = `
+                    <div class="flex items-center mt-1">
+                        <input type="checkbox" class="photo-input mr-2" ${item.requiresPhoto ? 'checked' : ''}>
+                        <label class="text-sm text-gray-600">Requires photo proof</label>
+                    </div>
+                `;
+
+                const basicCheckbox = `
+                    <div class="flex items-center mt-1">
+                        <input type="checkbox" class="basic-input mr-2" ${item.isBasic ? 'checked' : ''}>
+                        <label class="text-sm text-gray-600">Basic requirement (unlocks paid tasks)</label>
+                    </div>
+                `;
                 
                 let pointsInput = '';
                 if (settings.pointsEnabled) {
                     pointsInput = `
                         <div class="flex items-center">
-                            <label class="w-24 text-sm text-gray-600">Points:</label>
+                            <label class="w-24 text-sm text-gray-600">Stars:</label>
                             <input type="number" value="${item.points}" min="0" class="points-value border border-gray-300 rounded-md px-2 py-1 w-20">
                         </div>
                     `;
@@ -1106,12 +1553,14 @@ document.addEventListener("DOMContentLoaded", () => {
                         <select class="task-type border border-gray-300 rounded-md px-2 py-1 flex-grow">
                             <option value="focus" ${item.type === 'focus' ? 'selected' : ''}>Focus Block</option>
                             <option value="break" ${item.type === 'break' ? 'selected' : ''}>Break</option>
-                            <option value="chore" ${item.type === 'chore' ? 'selected' : ''}>Chore</option>
+                            <option value="chore" ${item.type === 'chore' ? 'selected' : ''}>Mission</option>
                             <option value="personal" ${item.type === 'personal' ? 'selected' : ''}>Personal</option>
                         </select>
                     </div>
                     ${pointsInput}
                     ${mealCheckbox}
+                    ${photoCheckbox}
+                    ${basicCheckbox}
                     <button class="delete-schedule-item text-red-500 hover:text-red-700 text-sm">
                         Remove this item
                     </button>
@@ -1209,7 +1658,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (settings.pointsEnabled) {
                 pointsInput = `
                     <div class="flex items-center">
-                        <label class="w-24 text-sm text-gray-600">Points:</label>
+                        <label class="w-24 text-sm text-gray-600">Stars:</label>
                         <input type="number" value="${settings.defaultPoints.dailyTask}" min="0" class="points-value border border-gray-300 rounded-md px-2 py-1 w-20">
                     </div>
                 `;
@@ -1233,7 +1682,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     <select class="task-type border border-gray-300 rounded-md px-2 py-1 flex-grow">
                         <option value="focus">Focus Block</option>
                         <option value="break">Break</option>
-                        <option value="chore">Chore</option>
+                        <option value="chore">Mission</option>
                         <option value="personal" selected>Personal</option>
                     </select>
                 </div>
@@ -1241,6 +1690,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 <div class="flex items-center mt-1">
                     <input type="checkbox" class="meal-input mr-2">
                     <label class="text-sm text-gray-600">Has meal input</label>
+                </div>
+                <div class="flex items-center mt-1">
+                    <input type="checkbox" class="photo-input mr-2">
+                    <label class="text-sm text-gray-600">Requires photo proof</label>
+                </div>
+                <div class="flex items-center mt-1">
+                    <input type="checkbox" class="basic-input mr-2">
+                    <label class="text-sm text-gray-600">Basic requirement (unlocks paid tasks)</label>
                 </div>
                 <button class="delete-schedule-item text-red-500 hover:text-red-700 text-sm">
                     Remove this item
@@ -1268,6 +1725,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 const taskInput = item.querySelector('.task-name');
                 const typeSelect = item.querySelector('.task-type');
                 const mealInput = item.querySelector('.meal-input');
+                const photoInput = item.querySelector('.photo-input');
+                const basicInput = item.querySelector('.basic-input');
                 const pointsInput = item.querySelector('.points-value');
                 
                 if (startTimeInput && startTimeInput.value && taskInput && taskInput.value) {
@@ -1277,7 +1736,9 @@ document.addEventListener("DOMContentLoaded", () => {
                         task: taskInput.value,
                         completed: false,
                         type: typeSelect ? typeSelect.value : 'personal',
-                        points: settings.pointsEnabled && pointsInput ? parseInt(pointsInput.value) : settings.defaultPoints.dailyTask
+                        points: settings.pointsEnabled && pointsInput ? parseInt(pointsInput.value) : settings.defaultPoints.dailyTask,
+                        requiresPhoto: photoInput ? photoInput.checked : false,
+                        isBasic: basicInput ? basicInput.checked : false
                     };
                     
                     if (endTimeInput && endTimeInput.value) {
@@ -1299,9 +1760,11 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         document.getElementById('add-weekly-chore').addEventListener('click', () => {
-            document.getElementById('chore-modal-title').textContent = 'Add Weekly Chore';
+            document.getElementById('chore-modal-title').textContent = 'Add Weekly Mission';
             document.getElementById('chore-name').value = '';
             document.getElementById('chore-points').value = settings.defaultPoints.weeklyChore;
+            document.getElementById('chore-requires-photo').checked = false;
+            document.getElementById('chore-basic').checked = false;
             document.getElementById('chore-day-container').classList.remove('hidden');
             document.getElementById('chore-week-container').classList.add('hidden');
             document.getElementById('save-chore').dataset.type = 'weekly';
@@ -1317,9 +1780,11 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         document.getElementById('add-monthly-chore').addEventListener('click', () => {
-            document.getElementById('chore-modal-title').textContent = 'Add Monthly Chore';
+            document.getElementById('chore-modal-title').textContent = 'Add Monthly Mission';
             document.getElementById('chore-name').value = '';
             document.getElementById('chore-points').value = settings.defaultPoints.monthlyChore;
+            document.getElementById('chore-requires-photo').checked = false;
+            document.getElementById('chore-basic').checked = false;
             document.getElementById('chore-day-container').classList.add('hidden');
             document.getElementById('chore-week-container').classList.remove('hidden');
             document.getElementById('save-chore').dataset.type = 'monthly';
@@ -1341,6 +1806,8 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById('save-chore').addEventListener('click', () => {
             const name = document.getElementById('chore-name').value.trim();
             const points = settings.pointsEnabled ? parseInt(document.getElementById('chore-points').value) : 0;
+            const requiresPhoto = document.getElementById('chore-requires-photo').checked;
+            const isBasic = document.getElementById('chore-basic').checked;
             const type = document.getElementById('save-chore').dataset.type;
             
             if (name) {
@@ -1353,7 +1820,9 @@ document.addEventListener("DOMContentLoaded", () => {
                         day: day,
                         task: name,
                         points: points || settings.defaultPoints.weeklyChore,
-                        completed: false
+                        completed: false,
+                        requiresPhoto,
+                        isBasic
                     });
                     
                     renderWeeklyChores();
@@ -1366,7 +1835,9 @@ document.addEventListener("DOMContentLoaded", () => {
                         week: week,
                         task: name,
                         points: points || settings.defaultPoints.monthlyChore,
-                        completed: false
+                        completed: false,
+                        requiresPhoto,
+                        isBasic
                     });
                     
                     renderMonthlyChores();
@@ -1433,14 +1904,14 @@ document.addEventListener("DOMContentLoaded", () => {
             
             pointsModal.classList.add('hidden');
             
-            showCelebration('Point settings updated!');
+            showCelebration('Allowance settings updated!');
         });
 
         document.getElementById('reset-points').addEventListener('click', () => {
-            if (confirm('Are you sure you want to reset all points to zero?')) {
+            if (confirm('Are you sure you want to reset all stars to zero?')) {
                 userPoints = 0;
                 updatePointsDisplay();
-                showCelebration('Points have been reset to zero.');
+                showCelebration('Stars have been reset to zero.');
             }
         });
 
@@ -1456,19 +1927,120 @@ document.addEventListener("DOMContentLoaded", () => {
             const item = scheduleItems.find(i => i.id === itemId);
             
             if (item) {
+                if (item.requiresPhoto) {
+                    mealModal.classList.add('hidden');
+                    openProofModal({ type: 'schedule', item });
+                    return;
+                }
                 item.completed = true;
                 if (settings.pointsEnabled) {
-                    userPoints += item.points;
-                    updatePointsDisplay();
-                    showCelebration(`You completed "${item.task}"! +${item.points} points`);
+                    if (areBasicsComplete()) {
+                        userPoints += item.points;
+                        updatePointsDisplay();
+                        showCelebration(`You completed "${item.task}"! +${item.points} stars`);
+                    } else {
+                        item.pendingRelease = true;
+                        pendingPoints += item.points;
+                        updatePointsDisplay();
+                        showCelebration(`You completed "${item.task}"! Stars are pending until basics are done.`);
+                    }
                 } else {
                     showCelebration(`You completed "${item.task}"!`);
                 }
                 renderSchedule();
                 updateProgress();
+                releasePendingRewards();
             }
             
             mealModal.classList.add('hidden');
+        });
+
+        document.getElementById('close-proof-modal').addEventListener('click', () => {
+            proofModal.classList.add('hidden');
+        });
+
+        document.getElementById('cancel-proof').addEventListener('click', () => {
+            proofModal.classList.add('hidden');
+        });
+
+        proofFileInput.addEventListener('change', () => {
+            const file = proofFileInput.files[0];
+            if (!file) {
+                proofPreviewWrapper.classList.add('hidden');
+                proofPreview.src = '';
+                document.getElementById('submit-proof').disabled = true;
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = () => {
+                proofPreview.src = reader.result;
+                proofPreviewWrapper.classList.remove('hidden');
+                document.getElementById('submit-proof').disabled = false;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        document.getElementById('submit-proof').addEventListener('click', () => {
+            const type = proofModal.dataset.type;
+            const itemId = parseInt(proofModal.dataset.itemId);
+            const item = getItemByType(type, itemId);
+
+            if (!item || !proofPreview.src) {
+                return;
+            }
+
+            item.proofImage = proofPreview.src;
+            requestApproval(item);
+            proofModal.classList.add('hidden');
+            showCelebration(`Proof uploaded for "${item.task}"! Stars are pending approval.`);
+
+            if (type === 'schedule') {
+                renderSchedule();
+                updateProgress();
+            } else if (type === 'weekly') {
+                renderWeeklyChores();
+            } else if (type === 'monthly') {
+                renderMonthlyChores();
+            }
+        });
+
+        function updateAdminVisibility() {
+            document.querySelectorAll('.admin-only').forEach(element => {
+                element.classList.toggle('hidden', !isAdmin);
+            });
+            adminToggle.textContent = isAdmin ? 'Admin Sign Out' : 'Admin Sign In';
+        }
+
+        adminToggle.addEventListener('click', () => {
+            if (isAdmin) {
+                isAdmin = false;
+                updateAdminVisibility();
+                showCelebration('Admin mode disabled.');
+                return;
+            }
+            adminPasscodeInput.value = '';
+            adminError.classList.add('hidden');
+            adminModal.classList.remove('hidden');
+        });
+
+        document.getElementById('close-admin-modal').addEventListener('click', () => {
+            adminModal.classList.add('hidden');
+        });
+
+        document.getElementById('admin-cancel').addEventListener('click', () => {
+            adminModal.classList.add('hidden');
+        });
+
+        document.getElementById('admin-login').addEventListener('click', () => {
+            if (adminPasscodeInput.value === adminPasscode) {
+                isAdmin = true;
+                adminModal.classList.add('hidden');
+                updateAdminVisibility();
+                showCelebration('Admin mode enabled.');
+            } else {
+                adminError.classList.remove('hidden');
+            }
         });
 
         document.getElementById('close-celebration').addEventListener('click', () => {
@@ -1488,6 +2060,7 @@ document.addEventListener("DOMContentLoaded", () => {
         renderMonthlyChores();
         renderRewards();
         updateProgress();
+        updateAdminVisibility();
 
         // Update time every second
         setInterval(updateDateTime, 1000);
@@ -1561,7 +2134,7 @@ function loadHistoryData(date) {
         if (tasks.length > 0) {
             html += '<div><h3 class="font-semibold text-gray-800 mb-1">Completed Tasks:</h3><ul class="list-disc list-inside text-gray-700">';
             tasks.forEach(t => {
-                html += `<li><strong>${t.time}</strong> – ${t.task} (${t.type})</li>`;
+                html += `<li><strong>${t.time}</strong> – ${t.task} (${formatTaskType(t.type)})</li>`;
             });
             html += '</ul></div>';
         } else {
