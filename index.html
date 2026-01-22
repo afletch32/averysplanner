@@ -61,6 +61,7 @@ function loadDailyNotes() {
         });
 }
 
+
 function loadTodayTasks() {
     return fetch(`load_tasks.php?user_id=${userId}&date=${getTodayString()}`)
         .then(response => response.json())
@@ -108,9 +109,13 @@ function loadHistoryData(date) {
         if (tasks.length > 0) {
             html += '<div><h3 class="font-semibold text-gray-800 mb-1">Daily Timeline:</h3><ul class="list-disc list-inside text-gray-700">';
             tasks.forEach(t => {
+
                 const status = t.completed ? '✅' : '⏳';
                 const actual = t.actualActivity ? ` — Actual: ${t.actualActivity}` : '';
                 html += `<li>${status} <strong>${t.time}</strong> – ${t.task} (${formatTaskType(t.type)})${actual}</li>`;
+
+                html += `<li><strong>${t.time}</strong> – ${t.task} (${formatTaskType(t.type)})</li>`;
+
             });
             html += '</ul></div>';
         } else {
@@ -246,6 +251,9 @@ document.addEventListener("DOMContentLoaded", () => {
                         Edit Adventure
                     </button>
                 </div>
+                <button id="edit-schedule" class="admin-only bg-blue-100 text-blue-600 px-3 py-1 rounded-md hover:bg-blue-200 transition">
+                    Edit Adventure
+                </button>
             </div>
             <div id="schedule-container" class="space-y-3"></div>
             
@@ -1145,6 +1153,7 @@ document.addEventListener("DOMContentLoaded", () => {
             proofModalDescription.textContent = item.requiresHomeworkCheck
                 ? 'Upload the Acellus progress screenshot. The app will auto-check for the daily star tracker.'
                 : 'Add a photo or screenshot to request approval.';
+            proofModalDescription.textContent = 'Add a photo or screenshot to request approval.';
             proofFileInput.value = '';
             proofPreviewWrapper.classList.add('hidden');
             proofPreview.src = '';
@@ -1264,6 +1273,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             <label class="text-xs text-gray-500 block">What actually happened?</label>
                             <textarea class="actual-activity w-full mt-1 p-2 border border-gray-200 rounded-md text-sm" rows="2" placeholder="Add a quick note about what she did...">${actualActivity}</textarea>
                         </div>
+                        ${proofPreviewHtml}
                     </div>
                     <div class="flex-shrink-0 ml-2 flex items-center">
                         <button class="complete-task w-6 h-6 rounded-full border-2 border-blue-500 flex items-center justify-center ${item.completed ? 'bg-blue-500' : ''} ${isPending ? 'opacity-50 cursor-not-allowed' : ''}" ${isPending ? 'aria-disabled="true"' : ''}>
@@ -1407,6 +1417,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 const isPendingRelease = chore.pendingRelease;
                 const isBasic = chore.isBasic;
                 const autoStatus = chore.autoReviewStatus;
+                        const isPending = chore.pendingApproval;
+                        const isPendingRelease = chore.pendingRelease;
+                        const isBasic = chore.isBasic;
 
                         if (chore.requiresPhoto) {
                             if (isPending) {
@@ -2104,6 +2117,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         requiresPhoto: photoInput ? photoInput.checked : false,
                         isBasic: basicInput ? basicInput.checked : false,
                         recurringDays: Array.from(recurringInputs).filter(input => input.checked).map(input => input.value)
+                        isBasic: basicInput ? basicInput.checked : false
                     };
                     
                     if (endTimeInput && endTimeInput.value) {
@@ -2348,6 +2362,108 @@ document.addEventListener("DOMContentLoaded", () => {
             reader.readAsDataURL(file);
         });
 
+        document.getElementById('submit-proof').addEventListener('click', () => {
+            const type = proofModal.dataset.type;
+            const itemId = parseInt(proofModal.dataset.itemId);
+            const item = getItemByType(type, itemId);
+
+            if (!item || !proofPreview.src) {
+                return;
+            }
+
+            item.proofImage = proofPreview.src;
+            requestApproval(item);
+            proofModal.classList.add('hidden');
+            showCelebration(`Proof uploaded for "${item.task}"! Stars are pending approval.`);
+
+            if (type === 'schedule') {
+                renderSchedule();
+                updateProgress();
+            } else if (type === 'weekly') {
+                renderWeeklyChores();
+            } else if (type === 'monthly') {
+                renderMonthlyChores();
+            }
+        });
+
+        function updateAdminVisibility() {
+            document.querySelectorAll('.admin-only').forEach(element => {
+                element.classList.toggle('hidden', !isAdmin);
+            });
+            adminToggle.textContent = isAdmin ? 'Admin Sign Out' : 'Admin Sign In';
+        }
+
+        adminToggle.addEventListener('click', () => {
+            if (isAdmin) {
+                isAdmin = false;
+                updateAdminVisibility();
+                showCelebration('Admin mode disabled.');
+                return;
+            }
+            adminPasscodeInput.value = '';
+            adminError.classList.add('hidden');
+            adminModal.classList.remove('hidden');
+        });
+
+        document.getElementById('close-admin-modal').addEventListener('click', () => {
+            adminModal.classList.add('hidden');
+        });
+
+        document.getElementById('admin-cancel').addEventListener('click', () => {
+            adminModal.classList.add('hidden');
+        });
+
+        document.getElementById('admin-login').addEventListener('click', () => {
+            if (adminPasscodeInput.value === adminPasscode) {
+                isAdmin = true;
+                adminModal.classList.add('hidden');
+                updateAdminVisibility();
+                showCelebration('Admin mode enabled.');
+            } else {
+                adminError.classList.remove('hidden');
+            }
+        });
+
+        document.getElementById('close-celebration').addEventListener('click', () => {
+            celebrationModal.classList.add('hidden');
+        });
+
+        document.getElementById('cancel-proof').addEventListener('click', () => {
+            proofModal.classList.add('hidden');
+        });
+
+        proofFileInput.addEventListener('change', () => {
+            const file = proofFileInput.files[0];
+            if (!file) {
+                proofPreviewWrapper.classList.add('hidden');
+                proofPreview.src = '';
+                document.getElementById('submit-proof').disabled = true;
+                return;
+            }
+        // Initialize the app
+        updateDateTime();
+        updatePointsDisplay();
+        renderSchedule();
+        renderWeeklyChores();
+        renderMonthlyChores();
+        renderRewards();
+        updateProgress();
+        updateAdminVisibility();
+
+        // Update time every second
+        setInterval(updateDateTime, 1000);
+    
+const userId = 1;
+
+            const reader = new FileReader();
+            reader.onload = () => {
+                proofPreview.src = reader.result;
+                proofPreviewWrapper.classList.remove('hidden');
+                document.getElementById('submit-proof').disabled = false;
+            };
+            reader.readAsDataURL(file);
+        });
+
         document.getElementById('submit-proof').addEventListener('click', async () => {
             const type = proofModal.dataset.type;
             const itemId = parseInt(proofModal.dataset.itemId);
@@ -2416,6 +2532,15 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById('admin-cancel').addEventListener('click', () => {
             adminModal.classList.add('hidden');
         });
+        if (tasks.length > 0) {
+            html += '<div><h3 class="font-semibold text-gray-800 mb-1">Completed Tasks:</h3><ul class="list-disc list-inside text-gray-700">';
+            tasks.forEach(t => {
+                html += `<li><strong>${t.time}</strong> – ${t.task} (${formatTaskType(t.type)})</li>`;
+            });
+            html += '</ul></div>';
+        } else {
+            html += '<p class="text-gray-500">No completed tasks for this day.</p>';
+        }
 
         document.getElementById('admin-login').addEventListener('click', () => {
             if (adminPasscodeInput.value === adminPasscode) {
