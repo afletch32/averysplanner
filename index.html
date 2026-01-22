@@ -35,7 +35,11 @@ function saveCompletedTasks() {
         time: item.time,
         type: item.type,
         completed: item.completed,
-        actualActivity: item.actualActivity || ''
+        actualActivity: item.actualActivity || '',
+        pendingApproval: !!item.pendingApproval,
+        pendingRelease: !!item.pendingRelease,
+        proofImage: item.proofImage || '',
+        autoReviewStatus: item.autoReviewStatus || ''
     }));
     const data = new URLSearchParams();
     data.append('user_id', userId);
@@ -77,8 +81,21 @@ function loadTodayTasks() {
                 if (target) {
                     target.completed = !!saved.completed;
                     target.actualActivity = saved.actualActivity || '';
+                    target.pendingApproval = !!saved.pendingApproval;
+                    target.pendingRelease = !!saved.pendingRelease;
+                    target.proofImage = saved.proofImage || '';
+                    target.autoReviewStatus = saved.autoReviewStatus || '';
                 }
             });
+            if (settings.pointsEnabled) {
+                pendingPoints = getScheduleItemsForDate(getTodayString()).reduce((total, item) => {
+                    if (item.pendingApproval || item.pendingRelease) {
+                        return total + (item.points || 0);
+                    }
+                    return total;
+                }, 0);
+                updatePointsDisplay();
+            }
         })
         .catch(() => {
             // Ignore load errors to allow offline usage.
@@ -1084,7 +1101,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         function areBasicsComplete() {
-            const basicItems = getAllItems().filter(item => item.isBasic || item.requiresPhoto);
+            const basicItems = getAllItems().filter(item => item.isBasic);
             if (basicItems.length === 0) {
                 return true;
             }
@@ -1113,6 +1130,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 pendingPoints += item.points;
                 updatePointsDisplay();
             }
+            if (scheduleItems.includes(item)) {
+                saveCompletedTasks();
+            }
         }
 
         function approveTask(item, label) {
@@ -1132,6 +1152,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 showCelebration(`"${label}" approved!`);
             }
             releasePendingRewards();
+            if (scheduleItems.includes(item)) {
+                saveCompletedTasks();
+            }
         }
 
         function denyTask(item, label) {
@@ -1144,6 +1167,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 updatePointsDisplay();
             }
             showCelebration(`"${label}" needs another try. Please upload a new photo.`);
+            if (scheduleItems.includes(item)) {
+                saveCompletedTasks();
+            }
         }
 
         function openProofModal({ type, item }) {
