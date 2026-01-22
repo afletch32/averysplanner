@@ -29,11 +29,13 @@ function savePointsToServer() {
 
 
 function saveCompletedTasks() {
-    const completed = scheduleItems.filter(item => item.completed).map(item => ({
+    const completed = getScheduleItemsForDate(getTodayString()).map(item => ({
         id: item.id,
         task: item.task,
         time: item.time,
-        type: item.type
+        type: item.type,
+        completed: item.completed,
+        actualActivity: item.actualActivity || ''
     }));
     const data = new URLSearchParams();
     data.append('user_id', userId);
@@ -59,6 +61,30 @@ function loadDailyNotes() {
         });
 }
 
+
+function loadTodayTasks() {
+    return fetch(`load_tasks.php?user_id=${userId}&date=${getTodayString()}`)
+        .then(response => response.json())
+        .then(tasks => {
+            if (!Array.isArray(tasks)) {
+                return;
+            }
+            tasks.forEach(saved => {
+                let target = scheduleItems.find(item => item.id === saved.id);
+                if (!target) {
+                    target = scheduleItems.find(item => item.time === saved.time && item.task === saved.task);
+                }
+                if (target) {
+                    target.completed = !!saved.completed;
+                    target.actualActivity = saved.actualActivity || '';
+                }
+            });
+        })
+        .catch(() => {
+            // Ignore load errors to allow offline usage.
+        });
+}
+
 function formatTaskType(type) {
     const labels = {
         focus: 'Focus Block',
@@ -81,9 +107,15 @@ function loadHistoryData(date) {
         let html = '';
 
         if (tasks.length > 0) {
-            html += '<div><h3 class="font-semibold text-gray-800 mb-1">Completed Tasks:</h3><ul class="list-disc list-inside text-gray-700">';
+            html += '<div><h3 class="font-semibold text-gray-800 mb-1">Daily Timeline:</h3><ul class="list-disc list-inside text-gray-700">';
             tasks.forEach(t => {
+
+                const status = t.completed ? '✅' : '⏳';
+                const actual = t.actualActivity ? ` — Actual: ${t.actualActivity}` : '';
+                html += `<li>${status} <strong>${t.time}</strong> – ${t.task} (${formatTaskType(t.type)})${actual}</li>`;
+
                 html += `<li><strong>${t.time}</strong> – ${t.task} (${formatTaskType(t.type)})</li>`;
+
             });
             html += '</ul></div>';
         } else {
@@ -202,6 +234,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 <button class="tab-btn py-2 px-4 font-semibold border-b-2 border-blue-500 text-blue-600" data-tab="schedule">Daily Adventure</button>
                 <button class="tab-btn py-2 px-4 font-semibold text-gray-500 hover:text-gray-700" data-tab="weekly">Weekly Missions</button>
                 <button class="tab-btn py-2 px-4 font-semibold text-gray-500 hover:text-gray-700" data-tab="monthly">Monthly Missions</button>
+                <button class="tab-btn py-2 px-4 font-semibold text-gray-500 hover:text-gray-700" data-tab="habits">Habits & Tasks</button>
                 <button class="tab-btn py-2 px-4 font-semibold text-gray-500 hover:text-gray-700" data-tab="rewards">Allowance & Rewards</button>
             </div>
         </div>
@@ -210,6 +243,14 @@ document.addEventListener("DOMContentLoaded", () => {
         <div id="schedule-tab" class="tab-content">
             <div class="flex justify-between mb-4">
                 <h2 class="text-xl font-bold text-gray-800">Today's Adventure</h2>
+                <div class="flex flex-wrap items-center gap-2 justify-end">
+                    <button id="refactor-schedule" class="bg-white text-blue-600 px-3 py-1 rounded-md border border-blue-200 hover:bg-blue-50 transition">
+                        Refactor Schedule
+                    </button>
+                    <button id="edit-schedule" class="admin-only bg-blue-100 text-blue-600 px-3 py-1 rounded-md hover:bg-blue-200 transition">
+                        Edit Adventure
+                    </button>
+                </div>
                 <button id="edit-schedule" class="admin-only bg-blue-100 text-blue-600 px-3 py-1 rounded-md hover:bg-blue-200 transition">
                     Edit Adventure
                 </button>
@@ -250,6 +291,15 @@ document.addEventListener("DOMContentLoaded", () => {
             <div class="grid grid-cols-1 gap-4" id="monthly-container">
                 <!-- Weeks will be populated here -->
             </div>
+        </div>
+
+        <!-- Habits Tab Content -->
+        <div id="habits-tab" class="tab-content hidden">
+            <div class="flex justify-between mb-4">
+                <h2 class="text-xl font-bold text-gray-800">Habit Tracker</h2>
+                <p class="text-sm text-gray-500">Track micro tasks by category and add new ones as needed.</p>
+            </div>
+            <div id="habits-container" class="space-y-4"></div>
         </div>
 
         <!-- Rewards Tab Content -->
@@ -555,17 +605,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
     </div>
 
+    <script src="https://unpkg.com/tesseract.js@5.0.5/dist/tesseract.min.js"></script>
     <script>
         // Initial data
         let scheduleItems = [
             { id: 1, time: '08:00', task: 'Wake up, make bed, Brush teeth', completed: false, type: 'personal', points: 5, isBasic: true },
             { id: 2, time: '08:30', task: 'Eat breakfast, Refill dog bowls (AM), Tidy room', completed: false, type: 'chore', points: 5, isBasic: true },
-            { id: 3, time: '09:00', task: 'Focus Block 1: Schoolwork', completed: false, type: 'focus', endTime: '11:00', points: 5, requiresPhoto: true },
+            { id: 3, time: '09:00', task: 'Focus Block 1: Schoolwork', completed: false, type: 'focus', endTime: '11:00', points: 5, requiresPhoto: true, requiresHomeworkCheck: true },
             { id: 4, time: '11:00', task: 'Movement break (walk/stretch)', completed: false, type: 'break', endTime: '11:15', points: 5 },
-            { id: 5, time: '11:15', task: 'Focus Block 2: Schoolwork', completed: false, type: 'focus', endTime: '13:15', points: 5, requiresPhoto: true },
+            { id: 5, time: '11:15', task: 'Focus Block 2: Schoolwork', completed: false, type: 'focus', endTime: '13:15', points: 5, requiresPhoto: true, requiresHomeworkCheck: true },
             { id: 6, time: '13:15', task: 'Lunch break', completed: false, type: 'break', endTime: '13:45', hasMealInput: true, points: 5 },
             { id: 7, time: '13:45', task: 'Dishes and kitchen cleanup', completed: false, type: 'chore', endTime: '14:15', points: 5, isBasic: true },
-            { id: 8, time: '14:15', task: 'Focus Block 3: Schoolwork', completed: false, type: 'focus', endTime: '16:15', points: 5, requiresPhoto: true },
+            { id: 8, time: '14:15', task: 'Focus Block 3: Schoolwork', completed: false, type: 'focus', endTime: '16:15', points: 5, requiresPhoto: true, requiresHomeworkCheck: true },
             { id: 9, time: '16:15', task: 'Free time / hobby', completed: false, type: 'personal', endTime: '17:15', points: 5 },
             { id: 10, time: '17:15', task: 'Clean up bedroom, Help with laundry', completed: false, type: 'chore', endTime: '18:15', points: 5, isBasic: true },
             { id: 11, time: '18:30', task: 'Dinner, Refill dog bowls (PM)', completed: false, type: 'personal', endTime: '19:30', points: 5 },
@@ -573,7 +624,8 @@ document.addEventListener("DOMContentLoaded", () => {
             { id: 13, time: '20:30', task: 'Snack & relax with Mom/Mimi', completed: false, type: 'personal', endTime: '21:30', points: 5 },
             { id: 14, time: '21:30', task: 'Wash face, Brush teeth, Wipe bathroom counter, Take medicine', completed: false, type: 'personal', endTime: '22:00', points: 5 },
             { id: 15, time: '22:00', task: 'Electronics off, wind down', completed: false, type: 'personal', endTime: '22:30', points: 5 },
-            { id: 16, time: '22:30', task: 'Bedtime', completed: false, type: 'personal', points: 5, isBasic: true }
+            { id: 16, time: '22:30', task: 'Bedtime', completed: false, type: 'personal', points: 5, isBasic: true },
+            { id: 17, time: '20:00', task: 'Musical theater', completed: false, type: 'personal', endTime: '21:00', points: 5, recurringDays: ['Tuesday'] }
         ];
 
         let weeklyChores = [
@@ -604,6 +656,68 @@ document.addEventListener("DOMContentLoaded", () => {
             { id: 4, name: 'Trip to favorite store', points: 100, icon: '🛍️' }
         ];
 
+        let habitCategories = [
+            {
+                name: 'Personal',
+                items: [
+                    { id: 'personal-brush-teeth-am', label: 'Brush teeth (AM)' },
+                    { id: 'personal-brush-teeth-pm', label: 'Brush teeth (PM)' },
+                    { id: 'personal-wash-face-am', label: 'Wash face (AM)' },
+                    { id: 'personal-wash-face-pm', label: 'Wash face (PM)' },
+                    { id: 'personal-shower', label: 'Shower' }
+                ]
+            },
+            {
+                name: 'Room',
+                items: [
+                    { id: 'room-removed-dishes-trash', label: 'Removed dishes & trash' },
+                    { id: 'room-put-laundry-away', label: 'Put laundry away' },
+                    { id: 'room-removed-dirty-laundry', label: 'Removed dirty laundry' },
+                    { id: 'room-put-crafts-away', label: 'Put crafts away' },
+                    { id: 'room-made-bed', label: 'Made bed' },
+                    { id: 'room-washed-bedding', label: 'Washed bedding' },
+                    { id: 'room-vacuumed', label: 'Vacuumed' }
+                ]
+            },
+            {
+                name: 'House',
+                items: [
+                    { id: 'house-dogs-water-am', label: 'Gave dogs water (AM)' },
+                    { id: 'house-dogs-water-pm', label: 'Gave dogs water (PM)' },
+                    { id: 'house-picked-up-kids', label: 'Picked up the kids' },
+                    { id: 'house-folded-laundry', label: 'Folded laundry' },
+                    { id: 'house-watched-kids', label: 'Watched the kids', requiresDuration: true },
+                    { id: 'house-swept-kitchen', label: 'Swept the kitchen' },
+                    { id: 'house-swept-bonus-room', label: 'Swept the bonus room' },
+                    { id: 'house-put-dishes-away', label: 'Put dishes away' },
+                    { id: 'house-loaded-dishwasher', label: 'Loaded dishwasher' },
+                    { id: 'house-washed-pots-pans', label: 'Washed pots/pans' },
+                    { id: 'house-wiped-counters', label: 'Wiped the counters' },
+                    { id: 'house-cleaned-table', label: 'Cleaned up the table' },
+                    { id: 'house-cleaned-bonus-room', label: 'Cleaned up the bonus room' },
+                    { id: 'house-vacuumed-rug', label: 'Vacuumed the rug' },
+                    { id: 'house-cleaned-back-door', label: 'Cleaned the back door' },
+                    { id: 'house-cleaned-front-door', label: 'Cleaned the front door' },
+                    { id: 'house-downstairs-bathroom-mirror', label: 'Downstairs bathroom mirror' },
+                    { id: 'house-upstairs-bathroom-mirror', label: 'Upstairs bathroom mirror' },
+                    { id: 'house-wiped-bathroom-counter-upstairs', label: 'Wiped bathroom counter upstairs' },
+                    { id: 'house-wiped-bathroom-counter-downstairs', label: 'Wiped bathroom counter downstairs' },
+                    { id: 'house-cleaned-kitchen-windows', label: 'Cleaned kitchen windows' }
+                ]
+            },
+            {
+                name: 'Yard',
+                items: [
+                    { id: 'yard-picked-trash', label: 'Picked up trash in yard' },
+                    { id: 'yard-picked-toys', label: 'Picked up toys in yard' },
+                    { id: 'yard-dog-poop', label: 'Dog poop' },
+                    { id: 'yard-weed-removal', label: 'Weed removal' }
+                ]
+            }
+        ];
+
+        const habitsStorageKey = 'habitTrackerData';
+
         // Settings
         let settings = {
             pointsEnabled: true,
@@ -617,6 +731,7 @@ document.addEventListener("DOMContentLoaded", () => {
         let userPoints = 0;
         let pendingPoints = 0;
         let isAdmin = false;
+        let scheduleRefactorActive = false;
         const adminPasscode = '1234';
         const maxPoints = 200;
         let dailyNotes = '';
@@ -630,6 +745,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const scheduleContainer = document.getElementById('schedule-container');
         const weeklyContainer = document.getElementById('weekly-container');
         const monthlyContainer = document.getElementById('monthly-container');
+        const habitsContainer = document.getElementById('habits-container');
         const rewardsContainer = document.getElementById('rewards-container');
         const pointsDisplay = document.getElementById('points-display');
         const pointsProgress = document.getElementById('points-progress');
@@ -706,6 +822,158 @@ document.addEventListener("DOMContentLoaded", () => {
                 personal: 'Personal'
             };
             return labels[type] || type;
+        }
+
+        function getDayName(dateString) {
+            const date = dateString ? new Date(`${dateString}T00:00:00`) : new Date();
+            return date.toLocaleDateString('en-US', { weekday: 'long' });
+        }
+
+        function getScheduleItemsForDate(dateString) {
+            const dayName = getDayName(dateString);
+            return scheduleItems.filter(item => {
+                if (Array.isArray(item.recurringDays) && item.recurringDays.length > 0) {
+                    return item.recurringDays.includes(dayName);
+                }
+                return true;
+            });
+        }
+
+        function reorderScheduleForNow(items) {
+            const now = new Date();
+            const currentTimeValue = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+            const sortedSchedule = [...items].sort((a, b) => a.time.localeCompare(b.time));
+            const pivotIndex = sortedSchedule.findIndex(item => item.time >= currentTimeValue);
+            return pivotIndex === -1
+                ? sortedSchedule
+                : [...sortedSchedule.slice(pivotIndex), ...sortedSchedule.slice(0, pivotIndex)];
+        }
+
+        function slugify(text) {
+            return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+        }
+
+        function loadHabitsFromStorage() {
+            const saved = localStorage.getItem(habitsStorageKey);
+            if (!saved) {
+                return;
+            }
+            try {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed)) {
+                    habitCategories = parsed;
+                }
+            } catch (error) {
+                console.warn('Failed to parse habits storage', error);
+            }
+        }
+
+        function loadHabitsFromServer() {
+            return fetch(`load_habits.php?user_id=${userId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (Array.isArray(data)) {
+                        habitCategories = data;
+                        saveHabitsToStorage();
+                    }
+                })
+                .catch(() => {
+                    // Ignore load errors to allow offline usage.
+                });
+        }
+
+        function saveHabitsToStorage() {
+            localStorage.setItem(habitsStorageKey, JSON.stringify(habitCategories));
+        }
+
+        function saveHabitsToServer() {
+            const data = new URLSearchParams();
+            data.append('user_id', userId);
+            data.append('habits', JSON.stringify(habitCategories));
+            fetch('save_habits.php', { method: 'POST', body: data });
+        }
+
+        function renderHabits() {
+            habitsContainer.innerHTML = '';
+
+            habitCategories.forEach(category => {
+                const section = document.createElement('div');
+                section.className = 'bg-white rounded-lg shadow-sm p-4';
+
+                const itemsHtml = category.items.map(item => {
+                    const durationValue = item.duration || '';
+                    const durationField = item.requiresDuration
+                        ? `<input type="text" data-id="${item.id}" class="habit-duration ml-2 w-28 border border-gray-300 rounded-md px-2 py-1 text-sm" placeholder="Duration" value="${durationValue}">`
+                        : '';
+                    return `
+                        <div class="flex items-center justify-between gap-2 py-1">
+                            <label class="flex items-center gap-2 text-sm text-gray-700">
+                                <input type="checkbox" data-id="${item.id}" class="habit-toggle" ${item.completed ? 'checked' : ''}>
+                                <span>${item.label}</span>
+                            </label>
+                            ${durationField}
+                        </div>
+                    `;
+                }).join('');
+
+                section.innerHTML = `
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-lg font-semibold text-gray-800">${category.name}</h3>
+                    </div>
+                    <div class="space-y-1">
+                        ${itemsHtml || '<p class="text-sm text-gray-500">No tasks yet.</p>'}
+                    </div>
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        <input type="text" class="habit-new flex-grow border border-gray-300 rounded-md px-3 py-2 text-sm" placeholder="Add a new task...">
+                        <button class="habit-add bg-blue-100 text-blue-600 px-3 py-2 rounded-md hover:bg-blue-200 transition">Add</button>
+                    </div>
+                `;
+
+                habitsContainer.appendChild(section);
+
+                const addButton = section.querySelector('.habit-add');
+                const newInput = section.querySelector('.habit-new');
+                addButton.addEventListener('click', () => {
+                    const value = newInput.value.trim();
+                    if (!value) {
+                        return;
+                    }
+                    const id = `${slugify(category.name)}-${slugify(value)}`;
+                    category.items.push({ id, label: value, completed: false });
+                    newInput.value = '';
+                    saveHabitsToStorage();
+                    saveHabitsToServer();
+                    renderHabits();
+                });
+            });
+
+            habitsContainer.querySelectorAll('.habit-toggle').forEach(toggle => {
+                toggle.addEventListener('change', () => {
+                    const id = toggle.dataset.id;
+                    habitCategories.forEach(category => {
+                        const item = category.items.find(entry => entry.id === id);
+                        if (item) {
+                            item.completed = toggle.checked;
+                        }
+                    });
+                    saveHabitsToStorage();
+                    saveHabitsToServer();
+                });
+            });
+
+            habitsContainer.querySelectorAll('.habit-duration').forEach(input => {
+                input.addEventListener('change', () => {
+                    const id = input.dataset.id;
+                    habitCategories.forEach(category => {
+                        const item = category.items.find(entry => entry.id === id);
+                        if (item) {
+                            item.duration = input.value.trim();
+                        }
+                    });
+                    saveHabitsToStorage();
+                    saveHabitsToServer();
+                });
+            });
         }
 
         function updateDateTime() {
@@ -882,6 +1150,9 @@ document.addEventListener("DOMContentLoaded", () => {
             proofModal.dataset.type = type;
             proofModal.dataset.itemId = item.id;
             proofModalTitle.textContent = `Upload Proof for "${item.task}"`;
+            proofModalDescription.textContent = item.requiresHomeworkCheck
+                ? 'Upload the Acellus progress screenshot. The app will auto-check for the daily star tracker.'
+                : 'Add a photo or screenshot to request approval.';
             proofModalDescription.textContent = 'Add a photo or screenshot to request approval.';
             proofFileInput.value = '';
             proofPreviewWrapper.classList.add('hidden');
@@ -890,13 +1161,40 @@ document.addEventListener("DOMContentLoaded", () => {
             proofModal.classList.remove('hidden');
         }
 
+        function normalizeText(text) {
+            return text.toLowerCase().replace(/\s+/g, ' ').trim();
+        }
+
+        function matchesAcellusTracker(text) {
+            const normalized = normalizeText(text);
+            const hasAcellus = normalized.includes('acellus');
+            const hasStars = normalized.includes('star');
+            const subjects = ['math', 'science', 'language arts', 'reading', 'social studies'];
+            const hasSubject = subjects.some(subject => normalized.includes(subject));
+            return hasAcellus && (hasStars || hasSubject);
+        }
+
+        async function autoReviewHomework(item) {
+            if (!window.Tesseract || !item.proofImage) {
+                return { approved: false, reason: 'OCR unavailable' };
+            }
+
+            const result = await window.Tesseract.recognize(item.proofImage, 'eng');
+            const text = result?.data?.text || '';
+            return { approved: matchesAcellusTracker(text), reason: text };
+        }
+
         function renderSchedule() {
             scheduleContainer.innerHTML = '';
-            
-            // Sort schedule by time
-            const sortedSchedule = [...scheduleItems].sort((a, b) => a.time.localeCompare(b.time));
-            
-            sortedSchedule.forEach(item => {
+
+            let itemsForToday = getScheduleItemsForDate(getTodayString());
+            if (scheduleRefactorActive) {
+                itemsForToday = reorderScheduleForNow(itemsForToday);
+            } else {
+                itemsForToday = itemsForToday.sort((a, b) => a.time.localeCompare(b.time));
+            }
+
+            itemsForToday.forEach(item => {
                 const itemEl = document.createElement('div');
                 itemEl.className = `schedule-item task-card flex items-center p-3 rounded-lg shadow-sm ${getTypeClass(item.type)} ${getTypeColor(item.type)} ${item.completed ? 'completed' : ''}`;
                 itemEl.dataset.id = item.id;
@@ -917,6 +1215,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const isPending = item.pendingApproval;
                 const isPendingRelease = item.pendingRelease;
                 const isBasic = item.isBasic;
+                const autoStatus = item.autoReviewStatus;
 
                 if (item.requiresPhoto) {
                     if (isPending) {
@@ -934,6 +1233,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                 }
 
+                if (autoStatus === 'approved') {
+                    statusLabel += '<span class="ml-2 text-xs font-semibold text-emerald-600">Auto-approved</span>';
+                } else if (autoStatus === 'denied') {
+                    statusLabel += '<span class="ml-2 text-xs font-semibold text-rose-600">Auto-denied</span>';
+                }
+
                 if (isPendingRelease) {
                     statusLabel += '<span class="ml-2 text-xs font-semibold text-amber-600">Pending basics</span>';
                 }
@@ -946,6 +1251,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     proofPreviewHtml = `<div class="mt-2"><img src="${item.proofImage}" alt="Proof preview" class="w-28 rounded-md border border-gray-200"></div>`;
                 }
 
+                const actualActivity = item.actualActivity ? item.actualActivity : '';
+                const actualActivityDisplay = actualActivity
+                    ? `<p class="text-sm text-gray-600 mt-1">Actual: ${actualActivity}</p>`
+                    : '';
+
                 itemEl.innerHTML = `
                     <div class="flex-shrink-0 w-24 text-center">
                         <span class="font-semibold text-gray-700">${timeDisplay}</span>
@@ -957,6 +1267,12 @@ document.addEventListener("DOMContentLoaded", () => {
                             ${statusLabel}
                         </div>
                         ${item.hasMealInput && item.completed && mealNotes ? `<p class="text-sm text-gray-600 mt-1">Ate: ${mealNotes}</p>` : ''}
+                        ${actualActivityDisplay}
+                        ${proofPreviewHtml}
+                        <div class="mt-2">
+                            <label class="text-xs text-gray-500 block">What actually happened?</label>
+                            <textarea class="actual-activity w-full mt-1 p-2 border border-gray-200 rounded-md text-sm" rows="2" placeholder="Add a quick note about what she did...">${actualActivity}</textarea>
+                        </div>
                         ${proofPreviewHtml}
                     </div>
                     <div class="flex-shrink-0 ml-2 flex items-center">
@@ -971,6 +1287,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 
                 // Add event listener to complete button
                 const completeBtn = itemEl.querySelector('.complete-task');
+                const actualActivityInput = itemEl.querySelector('.actual-activity');
                 completeBtn.addEventListener('click', () => {
                     if (item.pendingApproval) {
                         showCelebration(`"${item.task}" is waiting for approval.`);
@@ -1007,6 +1324,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             renderSchedule();
                             updateProgress();
                             releasePendingRewards();
+                            saveCompletedTasks();
                         }
                     } else {
                         item.completed = false;
@@ -1022,7 +1340,14 @@ document.addEventListener("DOMContentLoaded", () => {
                         item.proofImage = '';
                         renderSchedule();
                         updateProgress();
+                        saveCompletedTasks();
                     }
+                });
+
+                actualActivityInput.addEventListener('change', () => {
+                    item.actualActivity = actualActivityInput.value.trim();
+                    renderSchedule();
+                    saveCompletedTasks();
                 });
 
                 if (item.pendingApproval && isAdmin) {
@@ -1088,6 +1413,10 @@ document.addEventListener("DOMContentLoaded", () => {
                         let statusLabel = '';
                         let approvalActions = '';
                         let proofPreviewHtml = '';
+                const isPending = chore.pendingApproval;
+                const isPendingRelease = chore.pendingRelease;
+                const isBasic = chore.isBasic;
+                const autoStatus = chore.autoReviewStatus;
                         const isPending = chore.pendingApproval;
                         const isPendingRelease = chore.pendingRelease;
                         const isBasic = chore.isBasic;
@@ -1106,6 +1435,12 @@ document.addEventListener("DOMContentLoaded", () => {
                             } else {
                                 statusLabel = '<span class="ml-2 text-xs font-semibold text-gray-500">Photo required</span>';
                             }
+                        }
+
+                        if (autoStatus === 'approved') {
+                            statusLabel += '<span class="ml-2 text-xs font-semibold text-emerald-600">Auto-approved</span>';
+                        } else if (autoStatus === 'denied') {
+                            statusLabel += '<span class="ml-2 text-xs font-semibold text-rose-600">Auto-denied</span>';
                         }
 
                         if (isPendingRelease) {
@@ -1279,6 +1614,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         const isPending = chore.pendingApproval;
                         const isPendingRelease = chore.pendingRelease;
                         const isBasic = chore.isBasic;
+                        const autoStatus = chore.autoReviewStatus;
 
                         if (chore.requiresPhoto) {
                             if (isPending) {
@@ -1294,6 +1630,12 @@ document.addEventListener("DOMContentLoaded", () => {
                             } else {
                                 statusLabel = '<span class="ml-2 text-xs font-semibold text-gray-500">Photo required</span>';
                             }
+                        }
+
+                        if (autoStatus === 'approved') {
+                            statusLabel += '<span class="ml-2 text-xs font-semibold text-emerald-600">Auto-approved</span>';
+                        } else if (autoStatus === 'denied') {
+                            statusLabel += '<span class="ml-2 text-xs font-semibold text-rose-600">Auto-denied</span>';
                         }
 
                         if (isPendingRelease) {
@@ -1527,6 +1869,22 @@ document.addEventListener("DOMContentLoaded", () => {
                         <label class="text-sm text-gray-600">Basic requirement (unlocks paid tasks)</label>
                     </div>
                 `;
+
+                const recurringDays = Array.isArray(item.recurringDays) ? item.recurringDays : [];
+                const recurringCheckboxes = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+                    .map(day => `
+                        <label class="flex items-center gap-2 text-xs text-gray-600">
+                            <input type="checkbox" class="recurring-day" value="${day}" ${recurringDays.includes(day) ? 'checked' : ''}>
+                            ${day.slice(0, 3)}
+                        </label>
+                    `).join('');
+                const recurringInput = `
+                    <div class="flex flex-wrap items-center gap-2 mt-1">
+                        <span class="text-sm text-gray-600">Repeat on:</span>
+                        ${recurringCheckboxes}
+                        <span class="text-xs text-gray-400">(leave blank for daily)</span>
+                    </div>
+                `;
                 
                 let pointsInput = '';
                 if (settings.pointsEnabled) {
@@ -1561,6 +1919,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     ${mealCheckbox}
                     ${photoCheckbox}
                     ${basicCheckbox}
+                    ${recurringInput}
                     <button class="delete-schedule-item text-red-500 hover:text-red-700 text-sm">
                         Remove this item
                     </button>
@@ -1640,6 +1999,13 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         // Event listeners
+        document.getElementById('refactor-schedule').addEventListener('click', () => {
+            scheduleRefactorActive = true;
+            renderSchedule();
+            updateProgress();
+            showCelebration('Schedule refactored for the current time!');
+        });
+
         document.getElementById('edit-schedule').addEventListener('click', () => {
             renderEditSchedule();
             editModal.classList.remove('hidden');
@@ -1699,6 +2065,16 @@ document.addEventListener("DOMContentLoaded", () => {
                     <input type="checkbox" class="basic-input mr-2">
                     <label class="text-sm text-gray-600">Basic requirement (unlocks paid tasks)</label>
                 </div>
+                <div class="flex flex-wrap items-center gap-2 mt-1">
+                    <span class="text-sm text-gray-600">Repeat on:</span>
+                    ${['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => `
+                        <label class="flex items-center gap-2 text-xs text-gray-600">
+                            <input type="checkbox" class="recurring-day" value="${day}">
+                            ${day.slice(0, 3)}
+                        </label>
+                    `).join('')}
+                    <span class="text-xs text-gray-400">(leave blank for daily)</span>
+                </div>
                 <button class="delete-schedule-item text-red-500 hover:text-red-700 text-sm">
                     Remove this item
                 </button>
@@ -1728,6 +2104,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const photoInput = item.querySelector('.photo-input');
                 const basicInput = item.querySelector('.basic-input');
                 const pointsInput = item.querySelector('.points-value');
+                const recurringInputs = item.querySelectorAll('.recurring-day');
                 
                 if (startTimeInput && startTimeInput.value && taskInput && taskInput.value) {
                     const newItem = {
@@ -1738,6 +2115,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         type: typeSelect ? typeSelect.value : 'personal',
                         points: settings.pointsEnabled && pointsInput ? parseInt(pointsInput.value) : settings.defaultPoints.dailyTask,
                         requiresPhoto: photoInput ? photoInput.checked : false,
+                        isBasic: basicInput ? basicInput.checked : false,
+                        recurringDays: Array.from(recurringInputs).filter(input => input.checked).map(input => input.value)
                         isBasic: basicInput ? basicInput.checked : false
                     };
                     
@@ -1757,6 +2136,7 @@ document.addEventListener("DOMContentLoaded", () => {
             renderSchedule();
             updateProgress();
             editModal.classList.add('hidden');
+            saveCompletedTasks();
         });
 
         document.getElementById('add-weekly-chore').addEventListener('click', () => {
@@ -1950,6 +2330,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 renderSchedule();
                 updateProgress();
                 releasePendingRewards();
+                saveCompletedTasks();
             }
             
             mealModal.classList.add('hidden');
@@ -2047,11 +2428,18 @@ document.addEventListener("DOMContentLoaded", () => {
             celebrationModal.classList.add('hidden');
         });
 
-        document.getElementById('save-notes').addEventListener('click', () => {
-            dailyNotes = document.getElementById('daily-notes').value;
-            showCelebration('Notes saved successfully!');
+        document.getElementById('cancel-proof').addEventListener('click', () => {
+            proofModal.classList.add('hidden');
         });
 
+        proofFileInput.addEventListener('change', () => {
+            const file = proofFileInput.files[0];
+            if (!file) {
+                proofPreviewWrapper.classList.add('hidden');
+                proofPreview.src = '';
+                document.getElementById('submit-proof').disabled = true;
+                return;
+            }
         // Initialize the app
         updateDateTime();
         updatePointsDisplay();
@@ -2067,70 +2455,83 @@ document.addEventListener("DOMContentLoaded", () => {
     
 const userId = 1;
 
-function loadPointsFromServer() {
-    fetch(`load_points.php?user_id=${userId}`)
-        .then(response => response.text())
-        .then(points => {
-            userPoints = parseInt(points) || 0;
-            updatePointsDisplay();
+            const reader = new FileReader();
+            reader.onload = () => {
+                proofPreview.src = reader.result;
+                proofPreviewWrapper.classList.remove('hidden');
+                document.getElementById('submit-proof').disabled = false;
+            };
+            reader.readAsDataURL(file);
         });
-}
 
-function savePointsToServer() {
-    const data = new URLSearchParams();
-    data.append('user_id', userId);
-    data.append('total_points', userPoints);
+        document.getElementById('submit-proof').addEventListener('click', async () => {
+            const type = proofModal.dataset.type;
+            const itemId = parseInt(proofModal.dataset.itemId);
+            const item = getItemByType(type, itemId);
 
-    fetch('save_points.php', {
-        method: 'POST',
-        body: data
-    });
-}
+            if (!item || !proofPreview.src) {
+                return;
+            }
 
+            item.proofImage = proofPreview.src;
 
-function saveCompletedTasks() {
-    const completed = scheduleItems.filter(item => item.completed).map(item => ({
-        id: item.id,
-        task: item.task,
-        time: item.time,
-        type: item.type
-    }));
-    const data = new URLSearchParams();
-    data.append('user_id', userId);
-    data.append('date', getTodayString());
-    data.append('tasks', JSON.stringify(completed));
-    fetch('save_tasks.php', { method: 'POST', body: data });
-}
+            if (item.requiresHomeworkCheck) {
+                item.autoReviewStatus = 'pending';
+                proofModal.classList.add('hidden');
+                showCelebration(`Reviewing "${item.task}" screenshot...`);
 
-function saveDailyNotes() {
-    const data = new URLSearchParams();
-    data.append('user_id', userId);
-    data.append('date', getTodayString());
-    data.append('notes', dailyNotes);
-    fetch('save_notes.php', { method: 'POST', body: data });
-}
+                const review = await autoReviewHomework(item);
+                if (review.approved) {
+                    item.autoReviewStatus = 'approved';
+                    approveTask(item, item.task);
+                    showCelebration(`"${item.task}" auto-approved from the Acellus tracker!`);
+                } else {
+                    item.autoReviewStatus = 'denied';
+                    denyTask(item, item.task);
+                    showCelebration(`"${item.task}" auto-denied. Please upload a clear Acellus tracker screenshot.`);
+                }
+            } else {
+                requestApproval(item);
+                proofModal.classList.add('hidden');
+                showCelebration(`Proof uploaded for "${item.task}"! Stars are pending approval.`);
+            }
 
-function loadDailyNotes() {
-    fetch(`load_notes.php?user_id=${userId}&date=${getTodayString()}`)
-        .then(response => response.text())
-        .then(notes => {
-            dailyNotes = notes || '';
-            dailyNotesEl.value = dailyNotes;
+            if (type === 'schedule') {
+                renderSchedule();
+                updateProgress();
+            } else if (type === 'weekly') {
+                renderWeeklyChores();
+            } else if (type === 'monthly') {
+                renderMonthlyChores();
+            }
         });
-}
 
+        function updateAdminVisibility() {
+            document.querySelectorAll('.admin-only').forEach(element => {
+                element.classList.toggle('hidden', !isAdmin);
+            });
+            adminToggle.textContent = isAdmin ? 'Admin Sign Out' : 'Admin Sign In';
+        }
 
-function loadHistoryData(date) {
-    const dataBox = document.getElementById('history-content');
-    dataBox.innerHTML = '<p class="text-gray-500">Loading...</p>';
+        adminToggle.addEventListener('click', () => {
+            if (isAdmin) {
+                isAdmin = false;
+                updateAdminVisibility();
+                showCelebration('Admin mode disabled.');
+                return;
+            }
+            adminPasscodeInput.value = '';
+            adminError.classList.add('hidden');
+            adminModal.classList.remove('hidden');
+        });
 
-    Promise.all([
-        fetch(`load_notes.php?user_id=${userId}&date=${date}`).then(res => res.text()),
-        fetch(`load_tasks.php?user_id=${userId}&date=${date}`).then(res => res.json())
-    ])
-    .then(([notes, tasks]) => {
-        let html = '';
+        document.getElementById('close-admin-modal').addEventListener('click', () => {
+            adminModal.classList.add('hidden');
+        });
 
+        document.getElementById('admin-cancel').addEventListener('click', () => {
+            adminModal.classList.add('hidden');
+        });
         if (tasks.length > 0) {
             html += '<div><h3 class="font-semibold text-gray-800 mb-1">Completed Tasks:</h3><ul class="list-disc list-inside text-gray-700">';
             tasks.forEach(t => {
@@ -2141,28 +2542,47 @@ function loadHistoryData(date) {
             html += '<p class="text-gray-500">No completed tasks for this day.</p>';
         }
 
-        if (notes) {
-            html += '<div class="mt-4"><h3 class="font-semibold text-gray-800 mb-1">Notes:</h3>';
-            html += `<p class="text-gray-700 whitespace-pre-line">${notes}</p></div>`;
-        }
-
-        dataBox.innerHTML = html;
-    })
-    .catch(() => {
-        dataBox.innerHTML = '<p class="text-red-500">Failed to load history data.</p>';
-    });
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-    const historyInput = document.getElementById("history-date");
-    if (historyInput) {
-        historyInput.addEventListener("change", () => {
-            const selectedDate = historyInput.value;
-            if (selectedDate) loadHistoryData(selectedDate);
+        document.getElementById('admin-login').addEventListener('click', () => {
+            if (adminPasscodeInput.value === adminPasscode) {
+                isAdmin = true;
+                adminModal.classList.add('hidden');
+                updateAdminVisibility();
+                showCelebration('Admin mode enabled.');
+            } else {
+                adminError.classList.remove('hidden');
+            }
         });
-    }
-});
 
-</script>
+        document.getElementById('close-celebration').addEventListener('click', () => {
+            celebrationModal.classList.add('hidden');
+        });
+
+        document.getElementById('save-notes').addEventListener('click', () => {
+            dailyNotes = document.getElementById('daily-notes').value;
+            showCelebration('Notes saved successfully!');
+            saveDailyNotes();
+        });
+
+        // Initialize the app
+        updateDateTime();
+        updatePointsDisplay();
+        loadTodayTasks().finally(() => {
+            renderSchedule();
+            updateProgress();
+        });
+        loadDailyNotes();
+        loadHabitsFromStorage();
+        loadHabitsFromServer().finally(() => {
+            renderHabits();
+        });
+        renderWeeklyChores();
+        renderMonthlyChores();
+        renderRewards();
+        updateAdminVisibility();
+
+        // Update time every second
+        setInterval(updateDateTime, 1000);
+
+    </script>
 </body>
 </html>
