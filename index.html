@@ -1248,8 +1248,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         statusLabel = '<span class="ml-2 text-xs font-semibold text-amber-600">Pending approval</span>';
                         approvalActions = `
                             <div class="flex items-center gap-2 ml-3">
-                                <button class="approve-task text-xs bg-emerald-500 text-white px-2 py-1 rounded-md hover:bg-emerald-600">Approve</button>
-                                <button class="deny-task text-xs bg-rose-100 text-rose-600 px-2 py-1 rounded-md hover:bg-rose-200">Deny</button>
+                                <button class="admin-only approve-task text-xs bg-emerald-500 text-white px-2 py-1 rounded-md hover:bg-emerald-600">Approve</button>
+                                <button class="admin-only deny-task text-xs bg-rose-100 text-rose-600 px-2 py-1 rounded-md hover:bg-rose-200">Deny</button>
                             </div>
                         `;
                     } else if (item.completed) {
@@ -1380,11 +1380,19 @@ document.addEventListener("DOMContentLoaded", () => {
                     const approveBtn = itemEl.querySelector('.approve-task');
                     const denyBtn = itemEl.querySelector('.deny-task');
                     approveBtn.addEventListener('click', () => {
+                        if (!isAdmin) {
+                            showCelebration('Admin sign-in required to approve tasks.');
+                            return;
+                        }
                         approveTask(item, item.task);
                         renderSchedule();
                         updateProgress();
                     });
                     denyBtn.addEventListener('click', () => {
+                        if (!isAdmin) {
+                            showCelebration('Admin sign-in required to deny tasks.');
+                            return;
+                        }
                         denyTask(item, item.task);
                         renderSchedule();
                         updateProgress();
@@ -1452,8 +1460,8 @@ document.addEventListener("DOMContentLoaded", () => {
                                 statusLabel = '<span class="ml-2 text-xs font-semibold text-amber-600">Pending approval</span>';
                                 approvalActions = `
                                     <div class="flex items-center gap-2 ml-3">
-                                        <button class="approve-task text-xs bg-emerald-500 text-white px-2 py-1 rounded-md hover:bg-emerald-600">Approve</button>
-                                        <button class="deny-task text-xs bg-rose-100 text-rose-600 px-2 py-1 rounded-md hover:bg-rose-200">Deny</button>
+                                        <button class="admin-only approve-task text-xs bg-emerald-500 text-white px-2 py-1 rounded-md hover:bg-emerald-600">Approve</button>
+                                        <button class="admin-only deny-task text-xs bg-rose-100 text-rose-600 px-2 py-1 rounded-md hover:bg-rose-200">Deny</button>
                                     </div>
                                 `;
                             } else if (chore.completed) {
@@ -1556,10 +1564,18 @@ document.addEventListener("DOMContentLoaded", () => {
                             const approveBtn = choreEl.querySelector('.approve-task');
                             const denyBtn = choreEl.querySelector('.deny-task');
                             approveBtn.addEventListener('click', () => {
+                                if (!isAdmin) {
+                                    showCelebration('Admin sign-in required to approve chores.');
+                                    return;
+                                }
                                 approveTask(chore, chore.task);
                                 renderWeeklyChores();
                             });
                             denyBtn.addEventListener('click', () => {
+                                if (!isAdmin) {
+                                    showCelebration('Admin sign-in required to deny chores.');
+                                    return;
+                                }
                                 denyTask(chore, chore.task);
                                 renderWeeklyChores();
                             });
@@ -1647,8 +1663,8 @@ document.addEventListener("DOMContentLoaded", () => {
                                 statusLabel = '<span class="ml-2 text-xs font-semibold text-amber-600">Pending approval</span>';
                                 approvalActions = `
                                     <div class="flex items-center gap-2 ml-3">
-                                        <button class="approve-task text-xs bg-emerald-500 text-white px-2 py-1 rounded-md hover:bg-emerald-600">Approve</button>
-                                        <button class="deny-task text-xs bg-rose-100 text-rose-600 px-2 py-1 rounded-md hover:bg-rose-200">Deny</button>
+                                        <button class="admin-only approve-task text-xs bg-emerald-500 text-white px-2 py-1 rounded-md hover:bg-emerald-600">Approve</button>
+                                        <button class="admin-only deny-task text-xs bg-rose-100 text-rose-600 px-2 py-1 rounded-md hover:bg-rose-200">Deny</button>
                                     </div>
                                 `;
                             } else if (chore.completed) {
@@ -1751,10 +1767,18 @@ document.addEventListener("DOMContentLoaded", () => {
                             const approveBtn = choreEl.querySelector('.approve-task');
                             const denyBtn = choreEl.querySelector('.deny-task');
                             approveBtn.addEventListener('click', () => {
+                                if (!isAdmin) {
+                                    showCelebration('Admin sign-in required to approve chores.');
+                                    return;
+                                }
                                 approveTask(chore, chore.task);
                                 renderMonthlyChores();
                             });
                             denyBtn.addEventListener('click', () => {
+                                if (!isAdmin) {
+                                    showCelebration('Admin sign-in required to deny chores.');
+                                    return;
+                                }
                                 denyTask(chore, chore.task);
                                 renderMonthlyChores();
                             });
@@ -2423,6 +2447,9 @@ document.addEventListener("DOMContentLoaded", () => {
             if (isAdmin) {
                 isAdmin = false;
                 updateAdminVisibility();
+                renderSchedule();
+                renderWeeklyChores();
+                renderMonthlyChores();
                 showCelebration('Admin mode disabled.');
                 return;
             }
@@ -2444,6 +2471,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 isAdmin = true;
                 adminModal.classList.add('hidden');
                 updateAdminVisibility();
+                renderSchedule();
+                renderWeeklyChores();
+                renderMonthlyChores();
                 showCelebration('Admin mode enabled.');
             } else {
                 adminError.classList.remove('hidden');
@@ -2543,6 +2573,9 @@ const userId = 1;
             if (isAdmin) {
                 isAdmin = false;
                 updateAdminVisibility();
+                renderSchedule();
+                renderWeeklyChores();
+                renderMonthlyChores();
                 showCelebration('Admin mode disabled.');
                 return;
             }
@@ -2573,6 +2606,9 @@ const userId = 1;
                 isAdmin = true;
                 adminModal.classList.add('hidden');
                 updateAdminVisibility();
+                renderSchedule();
+                renderWeeklyChores();
+                renderMonthlyChores();
                 showCelebration('Admin mode enabled.');
             } else {
                 adminError.classList.remove('hidden');
