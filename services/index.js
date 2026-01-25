@@ -6,6 +6,7 @@ import { GoogleStore } from '../storage/googleStore.js';
 import { EmotionStore } from '../storage/emotionStore.js';
 import { SafetyNoteStore } from '../storage/safetyNoteStore.js';
 import { SchoolCheckinStore } from '../storage/schoolCheckinStore.js';
+import { WeeklyMissionStore } from '../storage/weeklyMissionStore.js';
 import { registerTaskRoutes } from './routes/tasks.js';
 import { registerSyncRoutes } from './routes/sync.js';
 import { registerGoogleRoutes } from './routes/google.js';
@@ -13,6 +14,7 @@ import { registerHealthRoutes } from './routes/health.js';
 import { registerEmotionRoutes } from './routes/emotion.js';
 import { registerSafetyNoteRoutes } from './routes/safetyNotes.js';
 import { registerSchoolRoutes } from './routes/school.js';
+import { registerWeeklyMissionRoutes } from './routes/weeklyMissions.js';
 import { requireAuth } from './auth/authMiddleware.js';
 
 class Router {
@@ -69,7 +71,8 @@ export default {
       googleStore: new GoogleStore(db),
       emotionStore: new EmotionStore(db),
       safetyNoteStore: new SafetyNoteStore(db),
-      schoolCheckinStore: new SchoolCheckinStore(db)
+      schoolCheckinStore: new SchoolCheckinStore(db),
+      weeklyMissionStore: new WeeklyMissionStore(db)
     };
 
     registerTaskRoutes(router, deps);
@@ -78,6 +81,7 @@ export default {
     registerEmotionRoutes(router, deps);
     registerSafetyNoteRoutes(router, deps);
     registerSchoolRoutes(router, deps);
+    registerWeeklyMissionRoutes(router, deps);
     registerHealthRoutes(router);
 
     const url = new URL(request.url);
