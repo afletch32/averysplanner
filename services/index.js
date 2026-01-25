@@ -5,12 +5,14 @@ import { SyncStore } from '../storage/syncStore.js';
 import { GoogleStore } from '../storage/googleStore.js';
 import { EmotionStore } from '../storage/emotionStore.js';
 import { SafetyNoteStore } from '../storage/safetyNoteStore.js';
+import { SchoolCheckinStore } from '../storage/schoolCheckinStore.js';
 import { registerTaskRoutes } from './routes/tasks.js';
 import { registerSyncRoutes } from './routes/sync.js';
 import { registerGoogleRoutes } from './routes/google.js';
 import { registerHealthRoutes } from './routes/health.js';
 import { registerEmotionRoutes } from './routes/emotion.js';
 import { registerSafetyNoteRoutes } from './routes/safetyNotes.js';
+import { registerSchoolRoutes } from './routes/school.js';
 import { requireAuth } from './auth/authMiddleware.js';
 
 class Router {
@@ -66,7 +68,8 @@ export default {
       syncStore: new SyncStore(db),
       googleStore: new GoogleStore(db),
       emotionStore: new EmotionStore(db),
-      safetyNoteStore: new SafetyNoteStore(db)
+      safetyNoteStore: new SafetyNoteStore(db),
+      schoolCheckinStore: new SchoolCheckinStore(db)
     };
 
     registerTaskRoutes(router, deps);
@@ -74,6 +77,7 @@ export default {
     registerGoogleRoutes(router, deps);
     registerEmotionRoutes(router, deps);
     registerSafetyNoteRoutes(router, deps);
+    registerSchoolRoutes(router, deps);
     registerHealthRoutes(router);
 
     const url = new URL(request.url);
