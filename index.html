@@ -642,7 +642,7 @@ document.addEventListener("DOMContentLoaded", () => {
             { id: 14, time: '21:30', task: 'Wash face, Brush teeth, Wipe bathroom counter, Take medicine', completed: false, type: 'personal', endTime: '22:00', points: 5 },
             { id: 15, time: '22:00', task: 'Electronics off, wind down', completed: false, type: 'personal', endTime: '22:30', points: 5 },
             { id: 16, time: '22:30', task: 'Bedtime', completed: false, type: 'personal', points: 5, isBasic: true },
-            { id: 17, time: '20:00', task: 'Musical theater', completed: false, type: 'personal', endTime: '21:00', points: 5, recurringDays: ['Tuesday'] }
+            { id: 17, time: '20:00', task: 'Musical theater', completed: false, type: 'personal', endTime: '21:00', points: 5, recurringDays: ['Tuesday'], isFixedTime: true }
         ];
 
         let weeklyChores = [
@@ -748,7 +748,6 @@ document.addEventListener("DOMContentLoaded", () => {
         let userPoints = 0;
         let pendingPoints = 0;
         let isAdmin = false;
-        let scheduleRefactorActive = false;
         const adminPasscode = '1234';
         const maxPoints = 200;
         let dailyNotes = '';
@@ -856,14 +855,83 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         }
 
-        function reorderScheduleForNow(items) {
+        function getCurrentTimeValue() {
             const now = new Date();
-            const currentTimeValue = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-            const sortedSchedule = [...items].sort((a, b) => a.time.localeCompare(b.time));
-            const pivotIndex = sortedSchedule.findIndex(item => item.time >= currentTimeValue);
-            return pivotIndex === -1
-                ? sortedSchedule
-                : [...sortedSchedule.slice(pivotIndex), ...sortedSchedule.slice(0, pivotIndex)];
+            return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+        }
+
+        function markScheduleItemComplete(item, { suppressCelebration = false } = {}) {
+            if (item.completed) {
+                return;
+            }
+            item.completed = true;
+            if (settings.pointsEnabled) {
+                if (areBasicsComplete()) {
+                    userPoints += item.points;
+                    updatePointsDisplay();
+                    if (!suppressCelebration) {
+                        showCelebration(`You completed "${item.task}"! +${item.points} stars`);
+                    }
+                } else {
+                    item.pendingRelease = true;
+                    pendingPoints += item.points;
+                    updatePointsDisplay();
+                    if (!suppressCelebration) {
+                        showCelebration(`You completed "${item.task}"! Stars are pending until basics are done.`);
+                    }
+                }
+            } else if (!suppressCelebration) {
+                showCelebration(`You completed "${item.task}"!`);
+            }
+        }
+
+        function assignRefactoredTimes(items) {
+            const movableItems = items.filter(item => !item.isFixedTime);
+            if (movableItems.length === 0) {
+                return;
+            }
+            const slots = movableItems
+                .map(item => ({ time: item.time, endTime: item.endTime }))
+                .sort((a, b) => a.time.localeCompare(b.time));
+            const pivotIndex = slots.findIndex(slot => slot.time >= getCurrentTimeValue());
+            const rotatedSlots = pivotIndex === -1
+                ? slots
+                : [...slots.slice(pivotIndex), ...slots.slice(0, pivotIndex)];
+
+            const sortedMovable = [...movableItems].sort((a, b) => a.time.localeCompare(b.time));
+            const incomplete = sortedMovable.filter(item => !item.completed);
+            const complete = sortedMovable.filter(item => item.completed);
+            const refactorOrder = [...incomplete, ...complete];
+
+            refactorOrder.forEach((item, index) => {
+                const slot = rotatedSlots[index];
+                if (!slot) {
+                    return;
+                }
+                item.time = slot.time;
+                item.endTime = slot.endTime;
+            });
+        }
+
+        function refactorScheduleForToday() {
+            const itemsForToday = getScheduleItemsForDate(getTodayString());
+            const uncheckedItems = itemsForToday.filter(item => !item.completed && !item.pendingApproval);
+
+            uncheckedItems.forEach(item => {
+                const confirmed = window.confirm(`Did you complete "${item.task}"?`);
+                if (!confirmed) {
+                    return;
+                }
+                if (item.requiresPhoto) {
+                    showCelebration(`"${item.task}" still needs a photo proof. Tap the circle to upload.`);
+                    return;
+                }
+                markScheduleItemComplete(item, { suppressCelebration: true });
+            });
+
+            assignRefactoredTimes(itemsForToday);
+            updateProgress();
+            saveCompletedTasks();
         }
 
         function slugify(text) {
@@ -1213,12 +1281,8 @@ document.addEventListener("DOMContentLoaded", () => {
         function renderSchedule() {
             scheduleContainer.innerHTML = '';
 
-            let itemsForToday = getScheduleItemsForDate(getTodayString());
-            if (scheduleRefactorActive) {
-                itemsForToday = reorderScheduleForNow(itemsForToday);
-            } else {
-                itemsForToday = itemsForToday.sort((a, b) => a.time.localeCompare(b.time));
-            }
+            const itemsForToday = getScheduleItemsForDate(getTodayString())
+                .sort((a, b) => a.time.localeCompare(b.time));
 
             itemsForToday.forEach(item => {
                 const itemEl = document.createElement('div');
@@ -1271,6 +1335,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 if (isBasic) {
                     statusLabel += '<span class="ml-2 text-xs font-semibold text-blue-600">Basic</span>';
+                }
+
+                if (item.isFixedTime) {
+                    statusLabel += '<span class="ml-2 text-xs font-semibold text-indigo-600">Fixed time</span>';
                 }
 
                 if (item.proofImage) {
@@ -1920,6 +1988,13 @@ document.addEventListener("DOMContentLoaded", () => {
                     </div>
                 `;
 
+                const fixedTimeCheckbox = `
+                    <div class="flex items-center mt-1">
+                        <input type="checkbox" class="fixed-time-input mr-2" ${item.isFixedTime ? 'checked' : ''}>
+                        <label class="text-sm text-gray-600">Lock time (skip refactor)</label>
+                    </div>
+                `;
+
                 const recurringDays = Array.isArray(item.recurringDays) ? item.recurringDays : [];
                 const recurringCheckboxes = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
                     .map(day => `
@@ -1969,6 +2044,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     ${mealCheckbox}
                     ${photoCheckbox}
                     ${basicCheckbox}
+                    ${fixedTimeCheckbox}
                     ${recurringInput}
                     <button class="delete-schedule-item text-red-500 hover:text-red-700 text-sm">
                         Remove this item
@@ -2050,10 +2126,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Event listeners
         document.getElementById('refactor-schedule').addEventListener('click', () => {
-            scheduleRefactorActive = true;
+            refactorScheduleForToday();
             renderSchedule();
             updateProgress();
-            showCelebration('Schedule refactored for the current time!');
+            showCelebration('Schedule refactored with incomplete tasks pulled forward!');
         });
 
         document.getElementById('edit-schedule').addEventListener('click', () => {
@@ -2115,6 +2191,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     <input type="checkbox" class="basic-input mr-2">
                     <label class="text-sm text-gray-600">Basic requirement (unlocks paid tasks)</label>
                 </div>
+                <div class="flex items-center mt-1">
+                    <input type="checkbox" class="fixed-time-input mr-2">
+                    <label class="text-sm text-gray-600">Lock time (skip refactor)</label>
+                </div>
                 <div class="flex flex-wrap items-center gap-2 mt-1">
                     <span class="text-sm text-gray-600">Repeat on:</span>
                     ${['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => `
@@ -2153,6 +2233,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const mealInput = item.querySelector('.meal-input');
                 const photoInput = item.querySelector('.photo-input');
                 const basicInput = item.querySelector('.basic-input');
+                const fixedTimeInput = item.querySelector('.fixed-time-input');
                 const pointsInput = item.querySelector('.points-value');
                 const recurringInputs = item.querySelectorAll('.recurring-day');
                 
@@ -2166,8 +2247,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         points: settings.pointsEnabled && pointsInput ? parseInt(pointsInput.value) : settings.defaultPoints.dailyTask,
                         requiresPhoto: photoInput ? photoInput.checked : false,
                         isBasic: basicInput ? basicInput.checked : false,
+                        isFixedTime: fixedTimeInput ? fixedTimeInput.checked : false,
                         recurringDays: Array.from(recurringInputs).filter(input => input.checked).map(input => input.value)
-                        isBasic: basicInput ? basicInput.checked : false
                     };
                     
                     if (endTimeInput && endTimeInput.value) {
@@ -2412,114 +2493,6 @@ document.addEventListener("DOMContentLoaded", () => {
             reader.readAsDataURL(file);
         });
 
-        document.getElementById('submit-proof').addEventListener('click', () => {
-            const type = proofModal.dataset.type;
-            const itemId = parseInt(proofModal.dataset.itemId);
-            const item = getItemByType(type, itemId);
-
-            if (!item || !proofPreview.src) {
-                return;
-            }
-
-            item.proofImage = proofPreview.src;
-            requestApproval(item);
-            proofModal.classList.add('hidden');
-            showCelebration(`Proof uploaded for "${item.task}"! Stars are pending approval.`);
-
-            if (type === 'schedule') {
-                renderSchedule();
-                updateProgress();
-            } else if (type === 'weekly') {
-                renderWeeklyChores();
-            } else if (type === 'monthly') {
-                renderMonthlyChores();
-            }
-        });
-
-        function updateAdminVisibility() {
-            document.querySelectorAll('.admin-only').forEach(element => {
-                element.classList.toggle('hidden', !isAdmin);
-            });
-            adminToggle.textContent = isAdmin ? 'Admin Sign Out' : 'Admin Sign In';
-        }
-
-        adminToggle.addEventListener('click', () => {
-            if (isAdmin) {
-                isAdmin = false;
-                updateAdminVisibility();
-                renderSchedule();
-                renderWeeklyChores();
-                renderMonthlyChores();
-                showCelebration('Admin mode disabled.');
-                return;
-            }
-            adminPasscodeInput.value = '';
-            adminError.classList.add('hidden');
-            adminModal.classList.remove('hidden');
-        });
-
-        document.getElementById('close-admin-modal').addEventListener('click', () => {
-            adminModal.classList.add('hidden');
-        });
-
-        document.getElementById('admin-cancel').addEventListener('click', () => {
-            adminModal.classList.add('hidden');
-        });
-
-        document.getElementById('admin-login').addEventListener('click', () => {
-            if (adminPasscodeInput.value === adminPasscode) {
-                isAdmin = true;
-                adminModal.classList.add('hidden');
-                updateAdminVisibility();
-                renderSchedule();
-                renderWeeklyChores();
-                renderMonthlyChores();
-                showCelebration('Admin mode enabled.');
-            } else {
-                adminError.classList.remove('hidden');
-            }
-        });
-
-        document.getElementById('close-celebration').addEventListener('click', () => {
-            celebrationModal.classList.add('hidden');
-        });
-
-        document.getElementById('cancel-proof').addEventListener('click', () => {
-            proofModal.classList.add('hidden');
-        });
-
-        proofFileInput.addEventListener('change', () => {
-            const file = proofFileInput.files[0];
-            if (!file) {
-                proofPreviewWrapper.classList.add('hidden');
-                proofPreview.src = '';
-                document.getElementById('submit-proof').disabled = true;
-                return;
-            }
-        // Initialize the app
-        updateDateTime();
-        updatePointsDisplay();
-        renderSchedule();
-        renderWeeklyChores();
-        renderMonthlyChores();
-        renderRewards();
-        updateProgress();
-        updateAdminVisibility();
-
-        // Update time every second
-        setInterval(updateDateTime, 1000);
-    
-const userId = 1;
-
-            const reader = new FileReader();
-            reader.onload = () => {
-                proofPreview.src = reader.result;
-                proofPreviewWrapper.classList.remove('hidden');
-                document.getElementById('submit-proof').disabled = false;
-            };
-            reader.readAsDataURL(file);
-        });
-
         document.getElementById('submit-proof').addEventListener('click', async () => {
             const type = proofModal.dataset.type;
             const itemId = parseInt(proofModal.dataset.itemId);
@@ -2591,15 +2564,6 @@ const userId = 1;
         document.getElementById('admin-cancel').addEventListener('click', () => {
             adminModal.classList.add('hidden');
         });
-        if (tasks.length > 0) {
-            html += '<div><h3 class="font-semibold text-gray-800 mb-1">Completed Tasks:</h3><ul class="list-disc list-inside text-gray-700">';
-            tasks.forEach(t => {
-                html += `<li><strong>${t.time}</strong> – ${t.task} (${formatTaskType(t.type)})</li>`;
-            });
-            html += '</ul></div>';
-        } else {
-            html += '<p class="text-gray-500">No completed tasks for this day.</p>';
-        }
 
         document.getElementById('admin-login').addEventListener('click', () => {
             if (adminPasscodeInput.value === adminPasscode) {
