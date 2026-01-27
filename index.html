@@ -29,18 +29,33 @@ function savePointsToServer() {
 
 
 function saveCompletedTasks() {
-    const completed = getScheduleItemsForDate(getTodayString()).map(item => ({
-        id: item.id,
-        task: item.task,
-        time: item.time,
-        type: item.type,
-        completed: item.completed,
-        actualActivity: item.actualActivity || '',
-        pendingApproval: !!item.pendingApproval,
-        pendingRelease: !!item.pendingRelease,
-        proofImage: item.proofImage || '',
-        autoReviewStatus: item.autoReviewStatus || ''
-    }));
+    const completed = getScheduleItemsForDate(getTodayString()).map(item => {
+        const proofRequired = item.proofRequired ?? item.requiresPhoto ?? false;
+        return {
+            id: item.id,
+            task: item.task,
+            time: item.time,
+            type: item.type,
+            completed: item.completed,
+            actualActivity: item.actualActivity || '',
+            pendingApproval: !!item.pendingApproval,
+            pendingRelease: !!item.pendingRelease,
+            proofImage: item.proofImage || '',
+            autoReviewStatus: item.autoReviewStatus || '',
+            points: Number.isFinite(item.points) ? item.points : 0,
+            endTime: item.endTime || '',
+            hasMealInput: !!item.hasMealInput,
+            requiresPhoto: !!item.requiresPhoto,
+            proofRequired,
+            requiresHomeworkCheck: !!item.requiresHomeworkCheck,
+            isBasic: !!item.isBasic,
+            isFixedTime: !!item.isFixedTime,
+            recurringDays: Array.isArray(item.recurringDays) ? item.recurringDays : [],
+            cashReward: Number.isFinite(item.cashReward) ? item.cashReward : 0,
+            goalTarget: Number.isFinite(item.goalTarget) ? item.goalTarget : 0,
+            rewardType: item.rewardType || 'stars'
+        };
+    });
     const data = new URLSearchParams();
     data.append('user_id', userId);
     data.append('date', getTodayString());
@@ -79,12 +94,49 @@ function loadTodayTasks() {
                     target = scheduleItems.find(item => item.time === saved.time && item.task === saved.task);
                 }
                 if (target) {
+                    const proofRequired = saved.proofRequired ?? saved.requiresPhoto;
                     target.completed = !!saved.completed;
                     target.actualActivity = saved.actualActivity || '';
                     target.pendingApproval = !!saved.pendingApproval;
                     target.pendingRelease = !!saved.pendingRelease;
                     target.proofImage = saved.proofImage || '';
                     target.autoReviewStatus = saved.autoReviewStatus || '';
+                    if (saved.points !== undefined) {
+                        target.points = saved.points;
+                    }
+                    if (saved.endTime !== undefined) {
+                        target.endTime = saved.endTime || '';
+                    }
+                    if (saved.hasMealInput !== undefined) {
+                        target.hasMealInput = !!saved.hasMealInput;
+                    }
+                    if (saved.requiresPhoto !== undefined) {
+                        target.requiresPhoto = !!saved.requiresPhoto;
+                    }
+                    if (proofRequired !== undefined) {
+                        target.proofRequired = !!proofRequired;
+                    }
+                    if (saved.requiresHomeworkCheck !== undefined) {
+                        target.requiresHomeworkCheck = !!saved.requiresHomeworkCheck;
+                    }
+                    if (saved.isBasic !== undefined) {
+                        target.isBasic = !!saved.isBasic;
+                    }
+                    if (saved.isFixedTime !== undefined) {
+                        target.isFixedTime = !!saved.isFixedTime;
+                    }
+                    if (saved.recurringDays !== undefined) {
+                        target.recurringDays = Array.isArray(saved.recurringDays) ? saved.recurringDays : [];
+                    }
+                    if (saved.cashReward !== undefined) {
+                        target.cashReward = saved.cashReward;
+                    }
+                    if (saved.goalTarget !== undefined) {
+                        target.goalTarget = saved.goalTarget;
+                    }
+                    if (saved.rewardType !== undefined) {
+                        target.rewardType = saved.rewardType || 'stars';
+                    }
                 }
             });
             if (settings.pointsEnabled) {
@@ -625,52 +677,107 @@ document.addEventListener("DOMContentLoaded", () => {
     <script src="https://unpkg.com/tesseract.js@5.0.5/dist/tesseract.min.js"></script>
     <script>
         // Initial data
+        const scheduleItemDefaults = {
+            completed: false,
+            type: 'personal',
+            points: 5,
+            endTime: '',
+            hasMealInput: false,
+            requiresPhoto: false,
+            proofRequired: false,
+            requiresHomeworkCheck: false,
+            isBasic: false,
+            isFixedTime: false,
+            recurringDays: [],
+            actualActivity: '',
+            pendingApproval: false,
+            pendingRelease: false,
+            proofImage: '',
+            autoReviewStatus: '',
+            cashReward: 0,
+            goalTarget: 0,
+            rewardType: 'stars'
+        };
+
+        const weeklyChoreDefaults = {
+            completed: false,
+            points: 10,
+            requiresPhoto: false,
+            proofRequired: false,
+            isBasic: false,
+            pendingApproval: false,
+            pendingRelease: false,
+            proofImage: '',
+            autoReviewStatus: '',
+            cashReward: 0,
+            goalTarget: 0,
+            rewardType: 'stars'
+        };
+
+        const monthlyChoreDefaults = {
+            completed: false,
+            points: 20,
+            requiresPhoto: false,
+            proofRequired: false,
+            isBasic: false,
+            pendingApproval: false,
+            pendingRelease: false,
+            proofImage: '',
+            autoReviewStatus: '',
+            cashReward: 0,
+            goalTarget: 0,
+            rewardType: 'stars'
+        };
+
+        const rewardDefaults = {
+            points: 20,
+            icon: '🎁',
+            rewardType: 'stars',
+            cashReward: 0,
+            goalTarget: 0,
+            proofRequired: false
+        };
+
         let scheduleItems = [
-            { id: 1, time: '08:00', task: 'Wake up, make bed, Brush teeth', completed: false, type: 'personal', points: 5, isBasic: true },
-            { id: 2, time: '08:30', task: 'Eat breakfast, Refill dog bowls (AM), Tidy room', completed: false, type: 'chore', points: 5, isBasic: true },
-            { id: 3, time: '09:00', task: 'Focus Block 1: Schoolwork', completed: false, type: 'focus', endTime: '11:00', points: 5, requiresPhoto: true, requiresHomeworkCheck: true },
-            { id: 4, time: '11:00', task: 'Movement break (walk/stretch)', completed: false, type: 'break', endTime: '11:15', points: 5 },
-            { id: 5, time: '11:15', task: 'Focus Block 2: Schoolwork', completed: false, type: 'focus', endTime: '13:15', points: 5, requiresPhoto: true, requiresHomeworkCheck: true },
-            { id: 6, time: '13:15', task: 'Lunch break', completed: false, type: 'break', endTime: '13:45', hasMealInput: true, points: 5 },
-            { id: 7, time: '13:45', task: 'Dishes and kitchen cleanup', completed: false, type: 'chore', endTime: '14:15', points: 5, isBasic: true },
-            { id: 8, time: '14:15', task: 'Focus Block 3: Schoolwork', completed: false, type: 'focus', endTime: '16:15', points: 5, requiresPhoto: true, requiresHomeworkCheck: true },
-            { id: 9, time: '16:15', task: 'Free time / hobby', completed: false, type: 'personal', endTime: '17:15', points: 5 },
-            { id: 10, time: '17:15', task: 'Clean up bedroom, Help with laundry', completed: false, type: 'chore', endTime: '18:15', points: 5, isBasic: true },
-            { id: 11, time: '18:30', task: 'Dinner, Refill dog bowls (PM)', completed: false, type: 'personal', endTime: '19:30', points: 5 },
-            { id: 12, time: '19:30', task: 'Shower, Clean room, Clean dog bowls (Saturday)', completed: false, type: 'chore', endTime: '20:30', points: 5, isBasic: true },
-            { id: 13, time: '20:30', task: 'Snack & relax with Mom/Mimi', completed: false, type: 'personal', endTime: '21:30', points: 5 },
-            { id: 14, time: '21:30', task: 'Wash face, Brush teeth, Wipe bathroom counter, Take medicine', completed: false, type: 'personal', endTime: '22:00', points: 5 },
-            { id: 15, time: '22:00', task: 'Electronics off, wind down', completed: false, type: 'personal', endTime: '22:30', points: 5 },
-            { id: 16, time: '22:30', task: 'Bedtime', completed: false, type: 'personal', points: 5, isBasic: true },
-            { id: 17, time: '20:00', task: 'Musical theater', completed: false, type: 'personal', endTime: '21:00', points: 5, recurringDays: ['Tuesday'], isFixedTime: true }
+            { ...scheduleItemDefaults, id: 1, time: '08:00', task: 'Wake up, make bed, Brush teeth', points: 5, type: 'personal', isBasic: true },
+            { ...scheduleItemDefaults, id: 2, time: '08:30', task: 'Eat breakfast, Refill dog bowls (AM), Tidy room', points: 5, type: 'chore', isBasic: true },
+            { ...scheduleItemDefaults, id: 3, time: '09:00', task: 'Focus Block 1: Schoolwork', points: 5, type: 'focus', endTime: '11:00', requiresPhoto: true, proofRequired: true, requiresHomeworkCheck: true },
+            { ...scheduleItemDefaults, id: 4, time: '11:00', task: 'Movement break (walk/stretch)', points: 5, type: 'break', endTime: '11:15' },
+            { ...scheduleItemDefaults, id: 5, time: '11:15', task: 'Focus Block 2: Schoolwork', points: 5, type: 'focus', endTime: '13:15', requiresPhoto: true, proofRequired: true, requiresHomeworkCheck: true },
+            { ...scheduleItemDefaults, id: 6, time: '13:15', task: 'Lunch break', points: 5, type: 'break', endTime: '13:45', hasMealInput: true },
+            { ...scheduleItemDefaults, id: 7, time: '13:45', task: 'Dishes and kitchen cleanup', points: 5, type: 'chore', endTime: '14:15', isBasic: true },
+            { ...scheduleItemDefaults, id: 8, time: '14:15', task: 'Focus Block 3: Schoolwork', points: 5, type: 'focus', endTime: '16:15', requiresPhoto: true, proofRequired: true, requiresHomeworkCheck: true },
+            { ...scheduleItemDefaults, id: 9, time: '16:15', task: 'Free time / hobby', points: 5, type: 'personal', endTime: '17:15' },
+            { ...scheduleItemDefaults, id: 10, time: '17:15', task: 'Clean up bedroom, Help with laundry', points: 5, type: 'chore', endTime: '18:15', isBasic: true },
+            { ...scheduleItemDefaults, id: 11, time: '18:30', task: 'Dinner, Refill dog bowls (PM)', points: 5, type: 'personal', endTime: '19:30' },
+            { ...scheduleItemDefaults, id: 12, time: '19:30', task: 'Shower, Clean room, Clean dog bowls (Saturday)', points: 5, type: 'chore', endTime: '20:30', isBasic: true },
+            { ...scheduleItemDefaults, id: 13, time: '20:30', task: 'Snack & relax with Mom/Mimi', points: 5, type: 'personal', endTime: '21:30' },
+            { ...scheduleItemDefaults, id: 14, time: '21:30', task: 'Wash face, Brush teeth, Wipe bathroom counter, Take medicine', points: 5, type: 'personal', endTime: '22:00' },
+            { ...scheduleItemDefaults, id: 15, time: '22:00', task: 'Electronics off, wind down', points: 5, type: 'personal', endTime: '22:30' },
+            { ...scheduleItemDefaults, id: 16, time: '22:30', task: 'Bedtime', points: 5, type: 'personal', isBasic: true },
+            { ...scheduleItemDefaults, id: 17, time: '20:00', task: 'Musical theater', points: 5, type: 'personal', endTime: '21:00', recurringDays: ['Tuesday'], isFixedTime: true }
         ];
 
         let weeklyChores = [
-            { id: 1, day: 'Monday', task: 'Help with laundry', points: 10, completed: false },
-            { id: 2, day: 'Tuesday', task: 'Vacuum bedroom', points: 10, completed: false },
-            { id: 3, day: 'Tuesday', task: 'Vacuum hallway', points: 5, completed: false },
-            { id: 4, day: 'Wednesday', task: 'Wipe bathroom sinks', points: 10, completed: false },
-            { id: 5, day: 'Wednesday', task: 'Help with laundry', points: 10, completed: false },
-            { id: 6, day: 'Thursday', task: 'Empty wastebaskets (room, bathrooms, Mimi\'s office)', points: 10, completed: false },
-            { id: 7, day: 'Friday', task: 'Help with laundry', points: 10, completed: false },
-            { id: 8, day: 'Saturday', task: 'Clean mirrors', points: 10, completed: false },
-            { id: 9, day: 'Saturday', task: 'Clean dog water bowls', points: 5, completed: false },
-            { id: 10, day: 'Sunday', task: 'Help with laundry', points: 10, completed: false },
-            { id: 11, day: 'Sunday', task: 'Tidy hobby/play area', points: 10, completed: false }
+            { ...weeklyChoreDefaults, id: 1, day: 'Weekly Goals', task: 'Log in on 5 days this week', points: 10 },
+            { ...weeklyChoreDefaults, id: 2, day: 'Weekly Goals', task: 'Upload 5 schoolwork proof photos', points: 10, requiresPhoto: true, proofRequired: true },
+            { ...weeklyChoreDefaults, id: 3, day: 'Weekly Goals', task: 'Complete Focus Block missions 8 times', points: 10 },
+            { ...weeklyChoreDefaults, id: 4, day: 'Weekly Goals', task: 'Finish 6 chore missions', points: 10 },
+            { ...weeklyChoreDefaults, id: 5, day: 'Weekly Goals', task: 'Track habits on 5 different days', points: 10 }
         ];
 
         let monthlyChores = [
-            { id: 1, week: 'Week 1', task: 'Closet clean', points: 20, completed: false },
-            { id: 2, week: 'Week 2', task: 'Wipe baseboards + door frames', points: 20, completed: false },
-            { id: 3, week: 'Week 3', task: 'Yarn and bead organization', points: 20, completed: false },
-            { id: 4, week: 'Week 4', task: 'Declutter desk or drawers', points: 20, completed: false }
+            { ...monthlyChoreDefaults, id: 1, week: 'Week 1', task: 'Complete 15 days of math', points: 20 },
+            { ...monthlyChoreDefaults, id: 2, week: 'Week 2', task: 'Complete 15 days of language arts', points: 20 },
+            { ...monthlyChoreDefaults, id: 3, week: 'Week 3', task: 'Complete 20 focus block sessions', points: 20 },
+            { ...monthlyChoreDefaults, id: 4, week: 'Week 4', task: 'Upload 15 schoolwork proof photos', points: 20, requiresPhoto: true, proofRequired: true }
         ];
 
         let rewards = [
-            { id: 1, name: '30 minutes extra screen time', points: 20, icon: '📱' },
-            { id: 2, name: 'Choose dinner one night', points: 50, icon: '🍕' },
-            { id: 3, name: 'New craft supplies', points: 75, icon: '🧶' },
-            { id: 4, name: 'Trip to favorite store', points: 100, icon: '🛍️' }
+            { ...rewardDefaults, id: 1, name: '30 minutes extra screen time', points: 20, icon: '📱', rewardType: 'stars' },
+            { ...rewardDefaults, id: 2, name: 'Choose dinner one night', points: 50, icon: '🍕', rewardType: 'stars' },
+            { ...rewardDefaults, id: 3, name: 'New craft supplies', points: 75, icon: '🧶', rewardType: 'stars' },
+            { ...rewardDefaults, id: 4, name: 'Trip to favorite store', points: 100, icon: '🛍️', rewardType: 'stars' }
         ];
 
         let habitCategories = [
@@ -922,7 +1029,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (!confirmed) {
                     return;
                 }
-                if (item.requiresPhoto) {
+                if (getProofRequired(item)) {
                     showCelebration(`"${item.task}" still needs a photo proof. Tap the circle to upload.`);
                     return;
                 }
@@ -1168,6 +1275,14 @@ document.addEventListener("DOMContentLoaded", () => {
             return [...scheduleItems, ...weeklyChores, ...monthlyChores];
         }
 
+        function getProofRequired(item) {
+            return item.proofRequired ?? item.requiresPhoto ?? false;
+        }
+
+        function getRewardType(reward) {
+            return reward.rewardType || 'stars';
+        }
+
         function areBasicsComplete() {
             const basicItems = getAllItems().filter(item => item.isBasic);
             if (basicItems.length === 0) {
@@ -1302,12 +1417,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 let statusLabel = '';
                 let approvalActions = '';
                 let proofPreviewHtml = '';
+                const proofRequired = getProofRequired(item);
                 const isPending = item.pendingApproval;
                 const isPendingRelease = item.pendingRelease;
                 const isBasic = item.isBasic;
                 const autoStatus = item.autoReviewStatus;
 
-                if (item.requiresPhoto) {
+                if (proofRequired) {
                     if (isPending) {
                         statusLabel = '<span class="ml-2 text-xs font-semibold text-amber-600">Pending approval</span>';
                         approvalActions = `
@@ -1388,7 +1504,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         return;
                     }
                     if (!item.completed) {
-                        if (item.requiresPhoto) {
+                        if (proofRequired) {
                             openProofModal({ type: 'schedule', item });
                             return;
                         }
@@ -1479,7 +1595,9 @@ document.addEventListener("DOMContentLoaded", () => {
             weeklyContainer.innerHTML = '';
             
             // Group chores by day
-            const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+            const baseDays = ['Weekly Goals', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+            const extraDays = [...new Set(weeklyChores.map(chore => chore.day))].filter(day => !baseDays.includes(day));
+            const days = [...baseDays, ...extraDays].filter(day => weeklyChores.some(chore => chore.day === day));
             
             days.forEach(day => {
                 const dayChores = weeklyChores.filter(chore => chore.day === day);
@@ -1515,15 +1633,13 @@ document.addEventListener("DOMContentLoaded", () => {
                         let statusLabel = '';
                         let approvalActions = '';
                         let proofPreviewHtml = '';
-                const isPending = chore.pendingApproval;
-                const isPendingRelease = chore.pendingRelease;
-                const isBasic = chore.isBasic;
-                const autoStatus = chore.autoReviewStatus;
+                        const proofRequired = getProofRequired(chore);
                         const isPending = chore.pendingApproval;
                         const isPendingRelease = chore.pendingRelease;
                         const isBasic = chore.isBasic;
+                        const autoStatus = chore.autoReviewStatus;
 
-                        if (chore.requiresPhoto) {
+                        if (proofRequired) {
                             if (isPending) {
                                 statusLabel = '<span class="ml-2 text-xs font-semibold text-amber-600">Pending approval</span>';
                                 approvalActions = `
@@ -1591,7 +1707,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                 return;
                             }
                             if (!chore.completed) {
-                                if (chore.requiresPhoto) {
+                                if (proofRequired) {
                                     openProofModal({ type: 'weekly', item: chore });
                                 } else {
                                     chore.completed = true;
@@ -1721,12 +1837,13 @@ document.addEventListener("DOMContentLoaded", () => {
                         let statusLabel = '';
                         let approvalActions = '';
                         let proofPreviewHtml = '';
+                        const proofRequired = getProofRequired(chore);
                         const isPending = chore.pendingApproval;
                         const isPendingRelease = chore.pendingRelease;
                         const isBasic = chore.isBasic;
                         const autoStatus = chore.autoReviewStatus;
 
-                        if (chore.requiresPhoto) {
+                        if (proofRequired) {
                             if (isPending) {
                                 statusLabel = '<span class="ml-2 text-xs font-semibold text-amber-600">Pending approval</span>';
                                 approvalActions = `
@@ -1794,7 +1911,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                 return;
                             }
                             if (!chore.completed) {
-                                if (chore.requiresPhoto) {
+                                if (proofRequired) {
                                     openProofModal({ type: 'monthly', item: chore });
                                 } else {
                                     chore.completed = true;
@@ -1892,8 +2009,23 @@ document.addEventListener("DOMContentLoaded", () => {
             rewards.forEach(reward => {
                 const rewardEl = document.createElement('div');
                 rewardEl.className = 'task-card p-4 bg-white rounded-lg shadow-sm';
-                
+                const rewardType = getRewardType(reward);
+                const cashReward = Number.isFinite(reward.cashReward) ? reward.cashReward : 0;
+                const goalTarget = Number.isFinite(reward.goalTarget) ? reward.goalTarget : 0;
                 const canAfford = userPoints >= reward.points;
+                const rewardMeta = [];
+                if (rewardType !== 'stars') {
+                    rewardMeta.push(rewardType === 'cash' ? 'Cash reward' : `Reward type: ${rewardType}`);
+                }
+                if (cashReward > 0) {
+                    rewardMeta.push(`$${cashReward.toFixed(2)} value`);
+                }
+                if (goalTarget > 0) {
+                    rewardMeta.push(`Goal: ${goalTarget} ⭐`);
+                }
+                const rewardMetaLine = rewardMeta.length > 0
+                    ? `<p class="text-xs text-gray-500">${rewardMeta.join(' • ')}</p>`
+                    : '';
                 
                 rewardEl.innerHTML = `
                     <div class="flex items-center mb-3">
@@ -1901,6 +2033,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         <div>
                             <h3 class="font-semibold text-gray-800">${reward.name}</h3>
                             <p class="text-purple-600 text-sm font-bold">${reward.points} stars</p>
+                            ${rewardMetaLine}
                         </div>
                     </div>
                     <div class="flex justify-between">
@@ -1976,7 +2109,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 const photoCheckbox = `
                     <div class="flex items-center mt-1">
-                        <input type="checkbox" class="photo-input mr-2" ${item.requiresPhoto ? 'checked' : ''}>
+                        <input type="checkbox" class="photo-input mr-2" ${getProofRequired(item) ? 'checked' : ''}>
                         <label class="text-sm text-gray-600">Requires photo proof</label>
                     </div>
                 `;
@@ -2238,6 +2371,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const recurringInputs = item.querySelectorAll('.recurring-day');
                 
                 if (startTimeInput && startTimeInput.value && taskInput && taskInput.value) {
+                    const proofRequired = photoInput ? photoInput.checked : false;
                     const newItem = {
                         id: index + 1,
                         time: startTimeInput.value,
@@ -2245,7 +2379,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         completed: false,
                         type: typeSelect ? typeSelect.value : 'personal',
                         points: settings.pointsEnabled && pointsInput ? parseInt(pointsInput.value) : settings.defaultPoints.dailyTask,
-                        requiresPhoto: photoInput ? photoInput.checked : false,
+                        requiresPhoto: proofRequired,
+                        proofRequired,
                         isBasic: basicInput ? basicInput.checked : false,
                         isFixedTime: fixedTimeInput ? fixedTimeInput.checked : false,
                         recurringDays: Array.from(recurringInputs).filter(input => input.checked).map(input => input.value)
@@ -2318,6 +2453,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const name = document.getElementById('chore-name').value.trim();
             const points = settings.pointsEnabled ? parseInt(document.getElementById('chore-points').value) : 0;
             const requiresPhoto = document.getElementById('chore-requires-photo').checked;
+            const proofRequired = requiresPhoto;
             const isBasic = document.getElementById('chore-basic').checked;
             const type = document.getElementById('save-chore').dataset.type;
             
@@ -2333,6 +2469,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         points: points || settings.defaultPoints.weeklyChore,
                         completed: false,
                         requiresPhoto,
+                        proofRequired,
                         isBasic
                     });
                     
@@ -2348,6 +2485,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         points: points || settings.defaultPoints.monthlyChore,
                         completed: false,
                         requiresPhoto,
+                        proofRequired,
                         isBasic
                     });
                     
@@ -2378,6 +2516,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const newId = rewards.length > 0 ? Math.max(...rewards.map(r => r.id)) + 1 : 1;
                 
                 rewards.push({
+                    ...rewardDefaults,
                     id: newId,
                     name: name,
                     points: points,
@@ -2438,7 +2577,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const item = scheduleItems.find(i => i.id === itemId);
             
             if (item) {
-                if (item.requiresPhoto) {
+                if (getProofRequired(item)) {
                     mealModal.classList.add('hidden');
                     openProofModal({ type: 'schedule', item });
                     return;
