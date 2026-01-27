@@ -628,7 +628,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 </div>
                 <p class="text-sm text-gray-600 mb-4" id="proof-modal-description">Add a photo or screenshot to request approval.</p>
                 <div class="space-y-4">
-                    <input type="file" id="proof-file" accept="image/*" class="w-full">
+                    <input type="file" id="proof-file" accept="image/*" capture="environment" class="w-full">
                     <div id="proof-preview-wrapper" class="hidden">
                         <p class="text-sm text-gray-600 mb-2">Preview</p>
                         <img id="proof-preview" class="w-full rounded-md border border-gray-200" alt="Proof preview">
@@ -1327,6 +1327,7 @@ document.addEventListener("DOMContentLoaded", () => {
         function approveTask(item, label) {
             item.pendingApproval = false;
             item.completed = true;
+            item.autoReviewStatus = '';
             if (settings.pointsEnabled) {
                 if (areBasicsComplete()) {
                     pendingPoints = Math.max(0, pendingPoints - item.points);
@@ -1351,6 +1352,7 @@ document.addEventListener("DOMContentLoaded", () => {
             item.completed = false;
             item.proofImage = '';
             item.pendingRelease = false;
+            item.autoReviewStatus = '';
             if (settings.pointsEnabled) {
                 pendingPoints = Math.max(0, pendingPoints - item.points);
                 updatePointsDisplay();
@@ -1368,7 +1370,6 @@ document.addEventListener("DOMContentLoaded", () => {
             proofModalDescription.textContent = item.requiresHomeworkCheck
                 ? 'Upload the Acellus progress screenshot. The app will auto-check for the daily star tracker.'
                 : 'Add a photo or screenshot to request approval.';
-            proofModalDescription.textContent = 'Add a photo or screenshot to request approval.';
             proofFileInput.value = '';
             proofPreviewWrapper.classList.add('hidden');
             proofPreview.src = '';
@@ -1445,8 +1446,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                 }
 
-                if (autoStatus === 'approved') {
+                if (autoStatus === 'pending') {
+                    statusLabel += '<span class="ml-2 text-xs font-semibold text-indigo-600">Reviewing screenshot</span>';
+                } else if (autoStatus === 'approved') {
                     statusLabel += '<span class="ml-2 text-xs font-semibold text-emerald-600">Auto-approved</span>';
+                } else if (autoStatus === 'needs-review') {
+                    statusLabel += '<span class="ml-2 text-xs font-semibold text-amber-600">Needs manual review</span>';
                 } else if (autoStatus === 'denied') {
                     statusLabel += '<span class="ml-2 text-xs font-semibold text-rose-600">Auto-denied</span>';
                 }
@@ -1489,7 +1494,6 @@ document.addEventListener("DOMContentLoaded", () => {
                             <label class="text-xs text-gray-500 block">What actually happened?</label>
                             <textarea class="actual-activity w-full mt-1 p-2 border border-gray-200 rounded-md text-sm" rows="2" placeholder="Add a quick note about what she did...">${actualActivity}</textarea>
                         </div>
-                        ${proofPreviewHtml}
                     </div>
                     <div class="flex-shrink-0 ml-2 flex items-center">
                         <button class="complete-task w-6 h-6 rounded-full border-2 border-blue-500 flex items-center justify-center ${item.completed ? 'bg-blue-500' : ''} ${isPending ? 'opacity-50 cursor-not-allowed' : ''}" ${isPending ? 'aria-disabled="true"' : ''}>
@@ -2658,9 +2662,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     approveTask(item, item.task);
                     showCelebration(`"${item.task}" auto-approved from the Acellus tracker!`);
                 } else {
-                    item.autoReviewStatus = 'denied';
-                    denyTask(item, item.task);
-                    showCelebration(`"${item.task}" auto-denied. Please upload a clear Acellus tracker screenshot.`);
+                    item.autoReviewStatus = 'needs-review';
+                    requestApproval(item);
+                    showCelebration(`"${item.task}" needs manual review. A parent can approve the screenshot.`);
                 }
             } else {
                 requestApproval(item);
